@@ -175,16 +175,11 @@ def create_solar_sensors(
     if leg1_tab <= 0 or leg2_tab <= 0:
         return entities
 
-    # Find the circuit IDs for the specified tabs
-    leg1_circuit_id = None
-    leg2_circuit_id = None
-
-    for circuit_id, circuit in span_panel.circuits.items():
-        if hasattr(circuit, "tabs") and circuit.tabs:
-            if leg1_tab in circuit.tabs:
-                leg1_circuit_id = circuit_id
-            if leg2_tab in circuit.tabs:
-                leg2_circuit_id = circuit_id
+    # Find the circuit IDs for the specified tabs using O(1) lookup
+    # This replaces O(n²) iteration for significant performance improvement
+    tab_mapping = span_panel.tab_to_circuit_id_map
+    leg1_circuit_id = tab_mapping.get(leg1_tab)
+    leg2_circuit_id = tab_mapping.get(leg2_tab)
 
     # Create solar sensors if both legs found
     if leg1_circuit_id and leg2_circuit_id:

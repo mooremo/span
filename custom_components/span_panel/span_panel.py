@@ -178,6 +178,31 @@ class SpanPanel:
         return self._circuits
 
     @property
+    def tab_to_circuit_id_map(self) -> dict[int, str]:
+        """Build O(1) mapping from tab number to circuit ID.
+
+        This property provides efficient tab lookup for solar sensor creation
+        and other operations that need to find circuits by tab number.
+
+        For circuits spanning multiple tabs (e.g., 240V circuits), each tab
+        in the circuit's tabs list will map to the same circuit_id.
+
+        Returns:
+            Dictionary mapping tab number (int) to circuit ID (str).
+            Empty dict if no circuits have tabs defined.
+
+        Example:
+            {1: "1", 2: "1", 3: "3"}  # Circuit "1" uses tabs 1&2, "3" uses tab 3
+
+        """
+        mapping: dict[int, str] = {}
+        for circuit_id, circuit in self._circuits.items():
+            if hasattr(circuit, "tabs") and circuit.tabs:
+                for tab in circuit.tabs:
+                    mapping[tab] = circuit_id
+        return mapping
+
+    @property
     def storage_battery(self) -> SpanPanelStorageBattery:
         """Get storage battery data atomically."""
         result = self._get_storage_battery()
