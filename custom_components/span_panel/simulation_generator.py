@@ -3,6 +3,60 @@
 This module inspects the current coordinator data and produces a YAML dict
 that matches span_panel_api's simulation reference. It infers templates from
 names and seeds energy profiles from current power readings.
+
+YAML Format Structure
+---------------------
+The generated YAML contains these main sections:
+
+- **panel_config**: Panel hardware configuration (serial, total_tabs, main_size)
+- **circuit_templates**: Reusable templates for circuit behavior patterns
+  - Each template defines energy_profile (power ranges, typical power, variation)
+  - Includes relay_behavior (controllable/non_controllable)
+  - Specifies priority (MUST_HAVE, NICE_TO_HAVE, NON_ESSENTIAL)
+  - Optional: cycling_pattern, time_of_day_profile, smart_behavior
+- **circuits**: List of individual circuits referencing templates
+  - Each has: id, name, tabs, template reference
+  - Optional overrides for specific circuits
+- **unmapped_tabs**: Tab numbers not assigned to any circuit
+- **unmapped_tab_templates**: Templates for unmapped tabs (e.g., solar)
+- **tab_synchronizations**: Groups of tabs that should sync (e.g., 240V circuits)
+- **simulation_params**: Update interval, time acceleration, noise factor
+
+Example Output
+--------------
+{
+    "panel_config": {
+        "serial_number": "DSM010000ABCDEF",
+        "total_tabs": 32,
+        "main_size": 200
+    },
+    "circuit_templates": {
+        "lighting": {
+            "energy_profile": {
+                "mode": "consumer",
+                "power_range": [0.0, 300.0],
+                "typical_power": 40.0,
+                "power_variation": 0.1
+            },
+            "relay_behavior": "controllable",
+            "priority": "NON_ESSENTIAL"
+        }
+    },
+    "circuits": [
+        {
+            "id": "1",
+            "name": "Kitchen Lights",
+            "tabs": [1],
+            "template": "lighting"
+        }
+    ],
+    "unmapped_tabs": [2, 3, 4, ...],
+    "simulation_params": {
+        "update_interval": 5,
+        "time_acceleration": 1.0,
+        "noise_factor": 0.02
+    }
+}
 """
 
 from __future__ import annotations
@@ -21,7 +75,38 @@ class SimulationYamlGenerator:
     solar_leg2: int | None = None
 
     async def build_yaml_from_live_panel(self) -> tuple[dict[str, Any], int]:
-        """Build YAML from live panel data."""
+        """Build simulation YAML configuration from live panel data.
+
+        Analyzes the current panel state from the coordinator and generates
+        a complete simulation YAML configuration that can be used to recreate
+        similar behavior in simulation mode.
+
+        Process:
+        1. Extract all circuits from coordinator data
+        2. Infer appropriate templates from circuit names and power readings
+        3. Create circuit entries with template references
+        4. Determine panel size (8, 32, or 40 tabs) from mapped tabs
+        5. Identify unmapped tabs
+        6. Add solar configuration if solar legs provided
+        7. Set sensible simulation parameters
+
+        Returns:
+            tuple[dict[str, Any], int]: A tuple containing:
+                - Complete YAML configuration dictionary (see module docstring for structure)
+                - Total number of tabs (8, 32, or 40) determined from circuit data
+
+        Note:
+            Circuits with IDs starting with "unmapped_tab_" are skipped as they
+            represent placeholder circuits for unmapped tabs and should not be
+            included in the simulation configuration.
+
+        Example:
+            generator = SimulationYamlGenerator(hass, coordinator, solar_leg1=5, solar_leg2=6)
+            yaml_dict, num_tabs = await generator.build_yaml_from_live_panel()
+            # yaml_dict now contains complete simulation configuration
+            # num_tabs is 8, 32, or 40 based on actual circuit distribution
+
+        """
         data = getattr(self.coordinator, "data", None)
         circuits_obj = getattr(data, "circuits", None)
 
@@ -107,6 +192,61 @@ class SimulationYamlGenerator:
         return snapshot_yaml, num_tabs
 
     def _maybe_add_solar(self, yaml_doc: dict[str, Any]) -> None:
+        """Add solar production configuration to YAML if solar legs are valid.
+
+        Modifies the YAML document in-place to add solar production configuration
+        for 240V split-phase solar systems using two unmapped tabs.
+
+        Solar configuration includes:
+        - A "solar_production" template with producer energy profile
+        - Unmapped tab templates for both solar legs
+        - Tab synchronization group for 240V split-phase behavior
+        - Updates to unmapped_tabs list
+
+        Args:
+            yaml_doc: The YAML configuration dictionary to modify in-place
+
+        Requirements for solar to be added:
+        - Both solar_leg1 and solar_leg2 must be set
+        - Both legs must be > 0
+        - Legs must be different (leg1 != leg2)
+
+        Note:
+            If requirements not met, the function returns without modifying yaml_doc.
+            This allows the generator to gracefully handle panels without solar.
+
+        Example solar configuration added:
+            {
+                "circuit_templates": {
+                    "solar_production": {
+                        "energy_profile": {
+                            "mode": "producer",
+                            "power_range": [-2000.0, 0.0],
+                            "typical_power": -1500.0,
+                            ...
+                        },
+                        "time_of_day_profile": {
+                            "enabled": True,
+                            "peak_hours": [11, 12, 13, 14, 15]
+                        }
+                    }
+                },
+                "unmapped_tab_templates": {
+                    "5": <solar_production template>,
+                    "6": <solar_production template>
+                },
+                "tab_synchronizations": [
+                    {
+                        "tabs": [5, 6],
+                        "behavior": "240v_split_phase",
+                        "power_split": "equal",
+                        "energy_sync": True,
+                        "template": "solar_production"
+                    }
+                ]
+            }
+
+        """
         l1 = int(self.solar_leg1 or 0)
         l2 = int(self.solar_leg2 or 0)
         if l1 <= 0 or l2 <= 0 or l1 == l2:
@@ -154,6 +294,44 @@ class SimulationYamlGenerator:
         yaml_doc["unmapped_tabs"] = sorted(set(yaml_doc.get("unmapped_tabs", [])) | {l1, l2})
 
     def _infer_template_key(self, name: str, power_w: float, tabs: list[int]) -> str:
+        """Infer appropriate template key from circuit characteristics.
+
+        Analyzes circuit name, power reading, and tab configuration to determine
+        which template best matches the circuit's expected behavior pattern.
+
+        Template inference rules (in priority order):
+        1. **lighting**: Name contains "light" or "lights"
+        2. **kitchen_outlets**: Name contains both "kitchen" and "outlet"
+        3. **hvac**: Name contains "hvac", "furnace", "air conditioner", "ac", or "heat pump"
+        4. **refrigerator**: Name contains "fridge", "refrigerator", or "wine fridge"
+        5. **ev_charger**: Name contains "ev" or "charger"
+        6. **pool_equipment**: Name contains "pool", "spa", or "fountain"
+        7. **always_on**: Name contains "internet", "router", "network", or "modem"
+        8. **major_appliance**: Circuit uses 2+ tabs (typically 240V circuits)
+        9. **outlets**: Name contains "outlet"
+        10. **producer**: Power reading is negative (generating power)
+        11. **major_appliance**: Default fallback for unrecognized circuits
+
+        Args:
+            name: Circuit name from panel (case-insensitive matching)
+            power_w: Current power reading in watts (negative = production)
+            tabs: List of tab numbers this circuit occupies
+
+        Returns:
+            str: Template key matching one of the known templates that
+                 will be created by _make_template()
+
+        Example:
+            _infer_template_key("Kitchen Lights", 45.0, [1])
+            # Returns: "lighting"
+
+            _infer_template_key("Main AC Unit", 3500.0, [15, 16])
+            # Returns: "hvac"
+
+            _infer_template_key("Solar Inverter", -1800.0, [5, 6])
+            # Returns: "producer"
+
+        """
         lname = name.lower()
         if any(k in lname for k in ("light", "lights")):
             return "lighting"
@@ -178,6 +356,106 @@ class SimulationYamlGenerator:
         return "major_appliance"
 
     def _make_template(self, key: str, typical: float, name: str) -> dict[str, Any]:
+        """Create a circuit template dictionary with realistic behavior parameters.
+
+        Generates a complete template configuration based on the template key,
+        seeding energy profiles with actual power readings from the live panel.
+
+        Each template includes:
+        - **energy_profile**: Power consumption/production characteristics
+          - mode: "consumer" or "producer"
+          - power_range: [min, max] power in watts
+          - typical_power: Expected average power (from live reading or sensible default)
+          - power_variation: Randomness factor (0.0-1.0)
+        - **relay_behavior**: "controllable" or "non_controllable"
+        - **priority**: "MUST_HAVE", "NICE_TO_HAVE", or "NON_ESSENTIAL"
+        - Optional features: cycling_pattern, time_of_day_profile, smart_behavior
+
+        Template Types:
+        ---------------
+        **producer**: Solar or other generation (-power)
+        - Negative power range based on typical output
+        - Non-controllable, MUST_HAVE priority
+        - 30% power variation for realistic generation patterns
+
+        **ev_charger**: Electric vehicle charging
+        - 0W to 7200W+ range (doubled from typical)
+        - Controllable, NON_ESSENTIAL priority
+        - Night-time charging profile (10pm-6am peak)
+        - Smart grid response (can reduce power 60% during stress)
+
+        **refrigerator**: Always-on appliances with cycling
+        - 50-200W range, ~120W typical
+        - Non-controllable, MUST_HAVE priority
+        - Cycling: 10min on, 30min off
+
+        **hvac**: Heating/cooling systems
+        - 0W to 2800W+ range, ~1800W typical
+        - Controllable, MUST_HAVE priority
+        - Cycling: 20min on, 40min off
+
+        **lighting**: General lighting circuits
+        - 0W to 300W range, ~40W typical
+        - Controllable, NON_ESSENTIAL priority
+        - Evening peak hours (6pm-10pm)
+
+        **kitchen_outlets**: High-power kitchen circuits
+        - 0W to 2400W+ range, ~300W typical
+        - Controllable, MUST_HAVE priority
+        - High variation (40%) for intermittent use
+
+        **outlets**: Standard outlet circuits
+        - 0W to 1800W range, ~150W typical
+        - Controllable, MUST_HAVE priority
+        - 40% variation for varied appliances
+
+        **always_on**: Network equipment, etc.
+        - 40-100W constant range, ~60W typical
+        - Controllable, MUST_HAVE priority
+        - Low variation (10%) for stable loads
+
+        **pool_equipment**: Pool pumps, heaters
+        - 0W to 1200W+ range, ~800W typical
+        - Controllable, NON_ESSENTIAL priority
+        - Long cycling: 2h on, 4h off
+
+        **major_appliance**: Fallback for unrecognized circuits
+        - 0W to 2500W+ range, ~800W typical
+        - Controllable, NON_ESSENTIAL priority
+        - Moderate variation (30%)
+
+        Args:
+            key: Template key from _infer_template_key()
+            typical: Actual power reading from live panel (used to seed ranges)
+            name: Circuit name (currently unused, available for future enhancements)
+
+        Returns:
+            dict[str, Any]: Complete template dictionary ready for YAML output
+
+        Note:
+            Power ranges are automatically scaled based on the typical reading
+            to ensure realistic simulation behavior. Negative typical values
+            automatically create producer templates regardless of key.
+
+        Example:
+            template = _make_template("lighting", 65.0, "Living Room Lights")
+            # Returns:
+            # {
+            #     "energy_profile": {
+            #         "mode": "consumer",
+            #         "power_range": [0.0, 130.0],  # 2x typical
+            #         "typical_power": 65.0,
+            #         "power_variation": 0.1
+            #     },
+            #     "relay_behavior": "controllable",
+            #     "priority": "NON_ESSENTIAL",
+            #     "time_of_day_profile": {
+            #         "enabled": True,
+            #         "peak_hours": [18, 19, 20, 21, 22]
+            #     }
+            # }
+
+        """
         # Base ranges derived from snapshot
         if key == "producer" or typical < 0:
             pr_min = min(typical * 2.0, -50.0)
