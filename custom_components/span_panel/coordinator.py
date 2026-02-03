@@ -296,15 +296,32 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
         This function is called when a pending_legacy_migration flag is found in the
         config entry data. It performs the migration and then cleans up the flag.
         The migration happens during the coordinator update cycle.
+
+        Implements retry logic with maximum 3 attempts to prevent infinite loops.
         """
-        # Always remove the flag first to prevent infinite loops
-        _LOGGER.info("Removing pending_legacy_migration flag to prevent loops")
-        current_options = dict(self.config_entry.options)
-        current_options.pop("pending_legacy_migration", None)
-        self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+        # Check attempt count to prevent infinite loops
+        MAX_MIGRATION_ATTEMPTS = 3
+        attempt_count = self.config_entry.options.get("legacy_migration_attempts", 0)
+
+        if attempt_count >= MAX_MIGRATION_ATTEMPTS:
+            _LOGGER.error(
+                "Legacy migration failed after %d attempts, giving up. "
+                "Manual intervention required - check entity registry for conflicts.",
+                MAX_MIGRATION_ATTEMPTS,
+            )
+            # Clear the flag and attempt count after max retries
+            current_options = dict(self.config_entry.options)
+            current_options.pop("pending_legacy_migration", None)
+            current_options.pop("legacy_migration_attempts", None)
+            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+            return
 
         try:
-            _LOGGER.info("Starting pending legacy migration")
+            _LOGGER.info(
+                "Starting pending legacy migration (attempt %d/%d)",
+                attempt_count + 1,
+                MAX_MIGRATION_ATTEMPTS,
+            )
 
             # Capture the old flags (legacy state)
             old_flags = {USE_CIRCUIT_NUMBERS: False, USE_DEVICE_PREFIX: False}
@@ -319,16 +336,43 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
 
             if success:
                 _LOGGER.info("Pending legacy migration completed successfully")
+                # Only clear flags on SUCCESS
+                current_options = dict(self.config_entry.options)
+                current_options.pop("pending_legacy_migration", None)
+                current_options.pop("legacy_migration_attempts", None)
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
                 _LOGGER.info("Scheduling final reload to display new entity IDs in UI")
                 # Schedule reload to pick up new entity IDs
                 self.hass.async_create_task(
                     self.hass.config_entries.async_reload(self.config_entry.entry_id)
                 )
             else:
-                _LOGGER.error("Pending legacy migration failed")
+                _LOGGER.warning(
+                    "Legacy migration failed (attempt %d/%d), will retry on next update",
+                    attempt_count + 1,
+                    MAX_MIGRATION_ATTEMPTS,
+                )
+                # Increment attempt counter but keep the flag
+                current_options = dict(self.config_entry.options)
+                current_options["legacy_migration_attempts"] = attempt_count + 1
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
 
         except Exception as e:
-            _LOGGER.error("Pending legacy migration task failed: %s", e, exc_info=True)
+            _LOGGER.error(
+                "Legacy migration task failed with exception (attempt %d/%d): %s",
+                attempt_count + 1,
+                MAX_MIGRATION_ATTEMPTS,
+                e,
+                exc_info=True,
+            )
+            # Increment attempt counter but keep the flag to allow retry
+            current_options = dict(self.config_entry.options)
+            current_options["legacy_migration_attempts"] = attempt_count + 1
+            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
 
     async def _handle_pending_naming_migration(self) -> None:
         """Handle pending naming pattern migration after integration startup.
@@ -336,15 +380,34 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
         This function is called when a pending_naming_migration flag is found in the
         config entry data. It performs the migration and then cleans up the flag.
         The migration happens during the coordinator update cycle.
+
+        Implements retry logic with maximum 3 attempts to prevent infinite loops.
         """
-        # Always remove the flag first to prevent infinite loops
-        _LOGGER.info("Removing pending_naming_migration flag to prevent loops")
-        current_options = dict(self.config_entry.options)
-        current_options.pop("pending_naming_migration", None)
-        self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+        # Check attempt count to prevent infinite loops
+        MAX_MIGRATION_ATTEMPTS = 3
+        attempt_count = self.config_entry.options.get("naming_migration_attempts", 0)
+
+        if attempt_count >= MAX_MIGRATION_ATTEMPTS:
+            _LOGGER.error(
+                "Naming pattern migration failed after %d attempts, giving up. "
+                "Manual intervention required - check entity registry for conflicts.",
+                MAX_MIGRATION_ATTEMPTS,
+            )
+            # Clear the flag and attempt count after max retries
+            current_options = dict(self.config_entry.options)
+            current_options.pop("pending_naming_migration", None)
+            current_options.pop("naming_migration_attempts", None)
+            current_options.pop("old_use_circuit_numbers", None)
+            current_options.pop("old_use_device_prefix", None)
+            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+            return
 
         try:
-            _LOGGER.info("Starting pending naming pattern migration")
+            _LOGGER.info(
+                "Starting pending naming pattern migration (attempt %d/%d)",
+                attempt_count + 1,
+                MAX_MIGRATION_ATTEMPTS,
+            )
 
             # Get the old flags that were stored during config flow processing
             old_flags = {
@@ -365,8 +428,10 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
 
             if success:
                 _LOGGER.info("Pending naming pattern migration completed successfully")
-                # Clean up the old flags that were stored for migration
+                # Only clear flags on SUCCESS
                 current_options = dict(self.config_entry.options)
+                current_options.pop("pending_naming_migration", None)
+                current_options.pop("naming_migration_attempts", None)
                 current_options.pop("old_use_circuit_numbers", None)
                 current_options.pop("old_use_device_prefix", None)
                 self.hass.config_entries.async_update_entry(
@@ -377,7 +442,27 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                     self.hass.config_entries.async_reload(self.config_entry.entry_id)
                 )
             else:
-                _LOGGER.error("Pending naming pattern migration failed")
+                _LOGGER.warning(
+                    "Naming pattern migration failed (attempt %d/%d), will retry on next update",
+                    attempt_count + 1,
+                    MAX_MIGRATION_ATTEMPTS,
+                )
+                # Increment attempt counter but keep the flag
+                current_options = dict(self.config_entry.options)
+                current_options["naming_migration_attempts"] = attempt_count + 1
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
 
         except Exception as e:
-            _LOGGER.error("Pending naming pattern migration task failed: %s", e, exc_info=True)
+            _LOGGER.error(
+                "Naming pattern migration task failed with exception (attempt %d/%d): %s",
+                attempt_count + 1,
+                MAX_MIGRATION_ATTEMPTS,
+                e,
+                exc_info=True,
+            )
+            # Increment attempt counter but keep the flag to allow retry
+            current_options = dict(self.config_entry.options)
+            current_options["naming_migration_attempts"] = attempt_count + 1
+            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
