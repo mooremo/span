@@ -1,5 +1,6 @@
 """Control switches."""
 
+import asyncio
 import logging
 from typing import Any, Literal
 
@@ -91,6 +92,9 @@ class SpanPanelCircuitsSwitch(CoordinatorEntity[SpanPanelCoordinator], SwitchEnt
 
         super().__init__(coordinator)
 
+        # Track background tasks for proper cleanup and error handling
+        self._background_tasks: set[asyncio.Task[None]] = set()
+
         self._update_is_on()
 
         # Use standard coordinator pattern - entities will update automatically
@@ -109,6 +113,17 @@ class SpanPanelCircuitsSwitch(CoordinatorEntity[SpanPanelCoordinator], SwitchEnt
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up when entity is removed."""
+        # Cancel any pending background tasks
+        for task in self._background_tasks:
+            if not task.done():
+                task.cancel()
+
+        # Wait for all tasks to complete or be cancelled
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
+
+        self._background_tasks.clear()
+
         # Call parent cleanup
         await super().async_will_remove_from_hass()
 
@@ -188,49 +203,74 @@ class SpanPanelCircuitsSwitch(CoordinatorEntity[SpanPanelCoordinator], SwitchEnt
 
     def turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-
-        self.hass.create_task(self.async_turn_on(**kwargs))
+        task = asyncio.create_task(self.async_turn_on(**kwargs))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     def turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        self.hass.create_task(self.async_turn_off(**kwargs))
+        task = asyncio.create_task(self.async_turn_off(**kwargs))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-        span_panel: SpanPanel = self.coordinator.data
-        circuits: dict[str, SpanPanelCircuit] = (
-            span_panel.circuits
-        )  # Get atomic snapshot of circuits
-        if self._circuit_id in circuits:
-            # Create a copy of the circuit for the operation
-            curr_circuit: SpanPanelCircuit = circuits[self._circuit_id].copy()
-            # Perform the state change
-            await span_panel.api.set_relay(curr_circuit, CircuitRelayState.CLOSED)
-            # Optimistically update local state to prevent UI bouncing
-            self._attr_is_on = True
-            if self.hass is not None:
-                self.async_write_ha_state()
-            # Request refresh to get the actual new state from panel
-            await self.coordinator.async_request_refresh()
+        try:
+            span_panel: SpanPanel = self.coordinator.data
+            circuits: dict[str, SpanPanelCircuit] = (
+                span_panel.circuits
+            )  # Get atomic snapshot of circuits
+            if self._circuit_id in circuits:
+                # Create a copy of the circuit for the operation
+                curr_circuit: SpanPanelCircuit = circuits[self._circuit_id].copy()
+                # Perform the state change
+                await span_panel.api.set_relay(curr_circuit, CircuitRelayState.CLOSED)
+                # Optimistically update local state to prevent UI bouncing
+                self._attr_is_on = True
+                if self.hass is not None:
+                    self.async_write_ha_state()
+                # Request refresh to get the actual new state from panel
+                await self.coordinator.async_request_refresh()
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to turn on switch for circuit_id=%s (%s): %s",
+                self._circuit_id,
+                self._attr_name or "unnamed",
+                err,
+                exc_info=True,
+            )
+            # Re-raise to ensure the error is visible in the Home Assistant logs
+            raise
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        span_panel: SpanPanel = self.coordinator.data
-        circuits: dict[str, SpanPanelCircuit] = (
-            span_panel.circuits
-        )  # Get atomic snapshot of circuits
-        if self._circuit_id in circuits:
-            # Create a copy of the circuit for the operation
-            curr_circuit: SpanPanelCircuit = circuits[self._circuit_id].copy()
-            # Perform the state change
-            await span_panel.api.set_relay(curr_circuit, CircuitRelayState.OPEN)
-            # Optimistically update local state to prevent UI bouncing
-            self._attr_is_on = False
-            # Only write state if hass is available
-            if self.hass is not None:
-                self.async_write_ha_state()
-            # Request refresh to get the actual new state from panel
-            await self.coordinator.async_request_refresh()
+        try:
+            span_panel: SpanPanel = self.coordinator.data
+            circuits: dict[str, SpanPanelCircuit] = (
+                span_panel.circuits
+            )  # Get atomic snapshot of circuits
+            if self._circuit_id in circuits:
+                # Create a copy of the circuit for the operation
+                curr_circuit: SpanPanelCircuit = circuits[self._circuit_id].copy()
+                # Perform the state change
+                await span_panel.api.set_relay(curr_circuit, CircuitRelayState.OPEN)
+                # Optimistically update local state to prevent UI bouncing
+                self._attr_is_on = False
+                # Only write state if hass is available
+                if self.hass is not None:
+                    self.async_write_ha_state()
+                # Request refresh to get the actual new state from panel
+                await self.coordinator.async_request_refresh()
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to turn off switch for circuit_id=%s (%s): %s",
+                self._circuit_id,
+                self._attr_name or "unnamed",
+                err,
+                exc_info=True,
+            )
+            # Re-raise to ensure the error is visible in the Home Assistant logs
+            raise
 
     def _construct_switch_unique_id(
         self,
