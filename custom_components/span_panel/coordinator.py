@@ -204,21 +204,47 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
             # Performance timing for error path
             error_cycle_start = _epoch_time()
 
-            # Log specific error types for debugging
+            # Log specific error types with actionable guidance
             if isinstance(err, SpanPanelSimulationOfflineError):
                 _LOGGER.debug("Span Panel simulation offline mode: %s", err)
             elif isinstance(err, SpanPanelConnectionError):
-                _LOGGER.warning("Span Panel connection error: %s", err)
+                _LOGGER.warning(
+                    "Unable to connect to SPAN Panel (%s). "
+                    "Check that the panel is powered on and network accessible. "
+                    "Integration will retry automatically.",
+                    err,
+                )
             elif isinstance(err, SpanPanelTimeoutError):
-                _LOGGER.warning("Span Panel timeout: %s", err)
+                _LOGGER.warning(
+                    "SPAN Panel request timed out (%s). "
+                    "This may indicate network congestion or panel performance issues. "
+                    "Integration will retry automatically.",
+                    err,
+                )
             elif isinstance(err, SpanPanelServerError):
-                _LOGGER.warning("Span Panel server error: %s", err)
+                _LOGGER.warning(
+                    "SPAN Panel server error (%s). "
+                    "The panel may be rebooting or experiencing issues. "
+                    "Integration will retry automatically.",
+                    err,
+                )
             elif isinstance(err, SpanPanelRetriableError):
-                _LOGGER.warning("Span Panel retriable error: %s", err)
+                _LOGGER.warning(
+                    "Temporary SPAN Panel error (%s). Integration will retry automatically.",
+                    err,
+                )
             elif isinstance(err, SpanPanelAPIError):
-                _LOGGER.warning("Span Panel API error: %s", err)
+                _LOGGER.warning(
+                    "SPAN Panel API error (%s). "
+                    "If this persists, check panel firmware version and network connectivity.",
+                    err,
+                )
             else:
-                _LOGGER.warning("Unexpected Span Panel error: %s", err)
+                _LOGGER.warning(
+                    "Unexpected SPAN Panel error (%s). "
+                    "If this persists, please report to integration maintainers with debug logs.",
+                    err,
+                )
 
             error_cycle_duration = _epoch_time() - error_cycle_start
 
