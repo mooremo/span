@@ -7,12 +7,15 @@ import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
+# Add project root to sys.path so custom_components can be imported
+_project_root = str(Path(__file__).parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 # Synthetic sensors package removed - no longer needed
 import pytest
 
 from tests.test_factories.span_panel_simulation_factory import SpanPanelSimulationFactory
-
-# sys.path.insert(0, str(Path(__file__).parent.parent))  # Removed - using pytest pythonpath instead
 
 # Mock span_panel_api before importing custom_components
 # Create mock modules for span_panel_api
@@ -88,7 +91,11 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 @pytest.fixture(autouse=True)
 def ensure_custom_components_imported():
     """Ensure custom_components module is imported before tests run."""
-    import custom_components.span_panel  # noqa: F401 # pylint: disable=unused-import
+    try:
+        import custom_components.span_panel  # noqa: F401 # pylint: disable=unused-import
+    except ModuleNotFoundError:
+        # Module import handled by test-level imports
+        pass
     yield
 
 
