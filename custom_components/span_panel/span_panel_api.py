@@ -1,6 +1,5 @@
 """Span Panel API - Updated to use span-panel-api package."""
 
-from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 import logging
@@ -434,8 +433,8 @@ class SpanPanelApi:
             await self._ensure_authenticated()
             panel_response = await self._client.get_panel_state()
 
-            # Convert the attrs model to dict and deep copy before processing
-            raw_data: Any = deepcopy(panel_response.to_dict())
+            # Convert attrs model to dict (from_dict does its own deepcopy)
+            raw_data: Any = panel_response.to_dict()
             panel_data: SpanPanelData = SpanPanelData.from_dict(raw_data, self.options)
 
             # Span Panel API might return empty result.
@@ -649,8 +648,9 @@ class SpanPanelApi:
 
             if raw_data.get("panel_state"):
                 # Process panel data (same as get_panel_data)
+                # from_dict does its own deepcopy, so no need for external copy
                 panel_state = raw_data["panel_state"]
-                panel_dict = deepcopy(panel_state.to_dict())
+                panel_dict = panel_state.to_dict()
                 result["panel"] = SpanPanelData.from_dict(panel_dict, self.options)
 
             if raw_data.get("circuits"):
