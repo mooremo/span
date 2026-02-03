@@ -73,11 +73,30 @@ PANEL_ENTITY_SUFFIX_MAPPING = {
 ALL_SUFFIX_MAPPINGS = {**CIRCUIT_SUFFIX_MAPPING, **PANEL_SUFFIX_MAPPING}
 
 
+# Pre-computed reverse mapping for O(1) lookup performance
+# Built once at module load time instead of rebuilding on every function call
+_REVERSE_SUFFIX_MAPPING: dict[str, str] = {}
+
+# Add circuit suffix mappings
+for _api_key, _user_suffix in CIRCUIT_SUFFIX_MAPPING.items():
+    _REVERSE_SUFFIX_MAPPING[_user_suffix] = _api_key
+
+# Add panel suffix mappings
+for _api_key, _user_suffix in PANEL_SUFFIX_MAPPING.items():
+    _REVERSE_SUFFIX_MAPPING[_user_suffix] = _api_key
+
+# Add panel entity suffix mappings (these take precedence for panel sensors)
+for _api_key, _entity_suffix in PANEL_ENTITY_SUFFIX_MAPPING.items():
+    _REVERSE_SUFFIX_MAPPING[_entity_suffix] = _api_key
+
+
 def get_api_description_key_from_suffix(suffix: str) -> str | None:
     """Reverse map from user-friendly suffix back to API description key.
 
     This is used for migration when we need to extract the original API description key
     from an entity_id suffix to call the helper functions correctly.
+
+    Uses pre-computed reverse mapping for O(1) lookup performance.
 
     Args:
         suffix: User-friendly suffix extracted from entity_id (e.g., "power", "energy_produced")
@@ -91,22 +110,8 @@ def get_api_description_key_from_suffix(suffix: str) -> str | None:
         get_api_description_key_from_suffix("current_power") → "instantGridPowerW"
 
     """
-    # Create reverse mapping from all suffix mappings
-    reverse_mapping = {}
-
-    # Add circuit suffix mappings
-    for api_key, user_suffix in CIRCUIT_SUFFIX_MAPPING.items():
-        reverse_mapping[user_suffix] = api_key
-
-    # Add panel suffix mappings
-    for api_key, user_suffix in PANEL_SUFFIX_MAPPING.items():
-        reverse_mapping[user_suffix] = api_key
-
-    # Add panel entity suffix mappings (these take precedence for panel sensors)
-    for api_key, entity_suffix in PANEL_ENTITY_SUFFIX_MAPPING.items():
-        reverse_mapping[entity_suffix] = api_key
-
-    return reverse_mapping.get(suffix)
+    # Use pre-computed reverse mapping (built at module load time)
+    return _REVERSE_SUFFIX_MAPPING.get(suffix)
 
 
 def get_suffix_from_sensor_key(sensor_key: str) -> str:
