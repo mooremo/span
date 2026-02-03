@@ -310,10 +310,15 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                 MAX_MIGRATION_ATTEMPTS,
             )
             # Clear the flag and attempt count after max retries
-            current_options = dict(self.config_entry.options)
-            current_options.pop("pending_legacy_migration", None)
-            current_options.pop("legacy_migration_attempts", None)
-            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+            try:
+                current_options = dict(self.config_entry.options)
+                current_options.pop("pending_legacy_migration", None)
+                current_options.pop("legacy_migration_attempts", None)
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
+            except Exception as update_err:
+                _LOGGER.error("Failed to clear migration flags after max attempts: %s", update_err)
             return
 
         try:
@@ -337,17 +342,25 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
             if success:
                 _LOGGER.info("Pending legacy migration completed successfully")
                 # Only clear flags on SUCCESS
-                current_options = dict(self.config_entry.options)
-                current_options.pop("pending_legacy_migration", None)
-                current_options.pop("legacy_migration_attempts", None)
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, options=current_options
-                )
-                _LOGGER.info("Scheduling final reload to display new entity IDs in UI")
-                # Schedule reload to pick up new entity IDs
-                self.hass.async_create_task(
-                    self.hass.config_entries.async_reload(self.config_entry.entry_id)
-                )
+                try:
+                    current_options = dict(self.config_entry.options)
+                    current_options.pop("pending_legacy_migration", None)
+                    current_options.pop("legacy_migration_attempts", None)
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, options=current_options
+                    )
+                    _LOGGER.info("Scheduling final reload to display new entity IDs in UI")
+                    # Schedule reload to pick up new entity IDs
+                    self.hass.async_create_task(
+                        self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                    )
+                except Exception as update_err:
+                    _LOGGER.error(
+                        "Failed to clear migration flags after successful migration: %s. "
+                        "Migration completed but flags may persist - reload integration manually.",
+                        update_err,
+                        exc_info=True,
+                    )
             else:
                 _LOGGER.warning(
                     "Legacy migration failed (attempt %d/%d), will retry on next update",
@@ -355,11 +368,19 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                     MAX_MIGRATION_ATTEMPTS,
                 )
                 # Increment attempt counter but keep the flag
-                current_options = dict(self.config_entry.options)
-                current_options["legacy_migration_attempts"] = attempt_count + 1
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, options=current_options
-                )
+                try:
+                    current_options = dict(self.config_entry.options)
+                    current_options["legacy_migration_attempts"] = attempt_count + 1
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, options=current_options
+                    )
+                except Exception as update_err:
+                    _LOGGER.error(
+                        "Failed to increment migration attempt counter: %s. "
+                        "Migration may retry more than %d times.",
+                        update_err,
+                        MAX_MIGRATION_ATTEMPTS,
+                    )
 
         except Exception as e:
             _LOGGER.error(
@@ -370,9 +391,19 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                 exc_info=True,
             )
             # Increment attempt counter but keep the flag to allow retry
-            current_options = dict(self.config_entry.options)
-            current_options["legacy_migration_attempts"] = attempt_count + 1
-            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+            try:
+                current_options = dict(self.config_entry.options)
+                current_options["legacy_migration_attempts"] = attempt_count + 1
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
+            except Exception as update_err:
+                _LOGGER.error(
+                    "Failed to increment migration attempt counter after exception: %s. "
+                    "Migration may retry more than %d times.",
+                    update_err,
+                    MAX_MIGRATION_ATTEMPTS,
+                )
 
     async def _handle_pending_naming_migration(self) -> None:
         """Handle pending naming pattern migration after integration startup.
@@ -394,12 +425,17 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                 MAX_MIGRATION_ATTEMPTS,
             )
             # Clear the flag and attempt count after max retries
-            current_options = dict(self.config_entry.options)
-            current_options.pop("pending_naming_migration", None)
-            current_options.pop("naming_migration_attempts", None)
-            current_options.pop("old_use_circuit_numbers", None)
-            current_options.pop("old_use_device_prefix", None)
-            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+            try:
+                current_options = dict(self.config_entry.options)
+                current_options.pop("pending_naming_migration", None)
+                current_options.pop("naming_migration_attempts", None)
+                current_options.pop("old_use_circuit_numbers", None)
+                current_options.pop("old_use_device_prefix", None)
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
+            except Exception as update_err:
+                _LOGGER.error("Failed to clear migration flags after max attempts: %s", update_err)
             return
 
         try:
@@ -429,18 +465,26 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
             if success:
                 _LOGGER.info("Pending naming pattern migration completed successfully")
                 # Only clear flags on SUCCESS
-                current_options = dict(self.config_entry.options)
-                current_options.pop("pending_naming_migration", None)
-                current_options.pop("naming_migration_attempts", None)
-                current_options.pop("old_use_circuit_numbers", None)
-                current_options.pop("old_use_device_prefix", None)
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, options=current_options
-                )
-                # Schedule reload to pick up new entity IDs
-                self.hass.async_create_task(
-                    self.hass.config_entries.async_reload(self.config_entry.entry_id)
-                )
+                try:
+                    current_options = dict(self.config_entry.options)
+                    current_options.pop("pending_naming_migration", None)
+                    current_options.pop("naming_migration_attempts", None)
+                    current_options.pop("old_use_circuit_numbers", None)
+                    current_options.pop("old_use_device_prefix", None)
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, options=current_options
+                    )
+                    # Schedule reload to pick up new entity IDs
+                    self.hass.async_create_task(
+                        self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                    )
+                except Exception as update_err:
+                    _LOGGER.error(
+                        "Failed to clear migration flags after successful migration: %s. "
+                        "Migration completed but flags may persist - reload integration manually.",
+                        update_err,
+                        exc_info=True,
+                    )
             else:
                 _LOGGER.warning(
                     "Naming pattern migration failed (attempt %d/%d), will retry on next update",
@@ -448,11 +492,19 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                     MAX_MIGRATION_ATTEMPTS,
                 )
                 # Increment attempt counter but keep the flag
-                current_options = dict(self.config_entry.options)
-                current_options["naming_migration_attempts"] = attempt_count + 1
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, options=current_options
-                )
+                try:
+                    current_options = dict(self.config_entry.options)
+                    current_options["naming_migration_attempts"] = attempt_count + 1
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, options=current_options
+                    )
+                except Exception as update_err:
+                    _LOGGER.error(
+                        "Failed to increment migration attempt counter: %s. "
+                        "Migration may retry more than %d times.",
+                        update_err,
+                        MAX_MIGRATION_ATTEMPTS,
+                    )
 
         except Exception as e:
             _LOGGER.error(
@@ -463,6 +515,16 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
                 exc_info=True,
             )
             # Increment attempt counter but keep the flag to allow retry
-            current_options = dict(self.config_entry.options)
-            current_options["naming_migration_attempts"] = attempt_count + 1
-            self.hass.config_entries.async_update_entry(self.config_entry, options=current_options)
+            try:
+                current_options = dict(self.config_entry.options)
+                current_options["naming_migration_attempts"] = attempt_count + 1
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=current_options
+                )
+            except Exception as update_err:
+                _LOGGER.error(
+                    "Failed to increment migration attempt counter after exception: %s. "
+                    "Migration may retry more than %d times.",
+                    update_err,
+                    MAX_MIGRATION_ATTEMPTS,
+                )
