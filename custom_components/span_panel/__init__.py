@@ -29,6 +29,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     NAME,
+    validate_scan_interval,
 )
 from .coordinator import SpanPanelCoordinator
 from .migration import migrate_config_entry_sensors
@@ -124,19 +125,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     use_ssl_value = config.get(CONF_USE_SSL, False)
 
-    # Get scan interval from options with a default, with coercion and clamp
+    # Get scan interval from options with a default, validate and normalize
     raw_scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL.seconds)
-    try:
-        scan_interval = int(float(raw_scan_interval))
-    except (TypeError, ValueError):
-        scan_interval = int(DEFAULT_SCAN_INTERVAL.total_seconds())
-
-    if scan_interval < 5:
-        _LOGGER.debug(
-            "Configured scan interval %s is below minimum; clamping to 5 seconds",
-            scan_interval,
-        )
-        scan_interval = 5
+    scan_interval = validate_scan_interval(raw_scan_interval)
 
     if str(raw_scan_interval) != str(scan_interval):
         _LOGGER.debug(

@@ -28,6 +28,7 @@ from .const import (
     DOMAIN,
     USE_CIRCUIT_NUMBERS,
     USE_DEVICE_PREFIX,
+    validate_scan_interval,
 )
 from .entity_id_naming_patterns import EntityIdMigrationManager
 from .exceptions import SpanPanelSimulationOfflineError
@@ -66,19 +67,8 @@ class SpanPanelCoordinator(DataUpdateCoordinator[SpanPanel]):
             CONF_SCAN_INTERVAL, int(DEFAULT_SCAN_INTERVAL.total_seconds())
         )
 
-        # Coerce scan interval to integer seconds, clamp to minimum of 5
-        try:
-            # Accept strings, floats, and ints; e.g., "15", 15.0, 15
-            scan_interval_seconds = int(float(raw_scan_interval))
-        except (TypeError, ValueError):
-            scan_interval_seconds = int(DEFAULT_SCAN_INTERVAL.total_seconds())
-
-        if scan_interval_seconds < 5:
-            _LOGGER.debug(
-                "Configured scan interval %s is below minimum; clamping to 5 seconds",
-                scan_interval_seconds,
-            )
-            scan_interval_seconds = 5
+        # Validate and normalize scan interval using centralized function
+        scan_interval_seconds = validate_scan_interval(raw_scan_interval)
 
         if str(raw_scan_interval) != str(scan_interval_seconds):
             _LOGGER.debug(
