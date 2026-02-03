@@ -16,7 +16,7 @@ def expected_lingering_timers():
 
 def test_validate_scan_interval_with_valid_int():
     """Test validation with valid integer input."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval(15)
     assert result == 15
@@ -24,7 +24,7 @@ def test_validate_scan_interval_with_valid_int():
 
 def test_validate_scan_interval_with_valid_float():
     """Test validation with float input (should convert to int)."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval(15.7)
     assert result == 15  # Should truncate to int
@@ -32,7 +32,7 @@ def test_validate_scan_interval_with_valid_float():
 
 def test_validate_scan_interval_with_string():
     """Test validation with string input."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval("20")
     assert result == 20
@@ -40,7 +40,7 @@ def test_validate_scan_interval_with_string():
 
 def test_validate_scan_interval_with_float_string():
     """Test validation with float string input."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval("15.5")
     assert result == 15  # Should convert via int(float())
@@ -48,7 +48,7 @@ def test_validate_scan_interval_with_float_string():
 
 def test_validate_scan_interval_clamps_to_minimum():
     """Test that values below 5 are clamped to 5."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     # Test various values below minimum
     assert validate_scan_interval(0) == 5
@@ -59,7 +59,7 @@ def test_validate_scan_interval_clamps_to_minimum():
 
 def test_validate_scan_interval_accepts_minimum():
     """Test that exactly 5 is accepted."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval(5)
     assert result == 5
@@ -67,10 +67,8 @@ def test_validate_scan_interval_accepts_minimum():
 
 def test_validate_scan_interval_with_none():
     """Test validation with None (should return default)."""
-    from custom_components.span_panel.const import (
-        validate_scan_interval,
-        DEFAULT_SCAN_INTERVAL,
-    )
+    from custom_components.span_panel.const import DEFAULT_SCAN_INTERVAL
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval(None)
     assert result == int(DEFAULT_SCAN_INTERVAL.total_seconds())
@@ -78,10 +76,8 @@ def test_validate_scan_interval_with_none():
 
 def test_validate_scan_interval_with_invalid_string():
     """Test validation with invalid string (should return default)."""
-    from custom_components.span_panel.const import (
-        validate_scan_interval,
-        DEFAULT_SCAN_INTERVAL,
-    )
+    from custom_components.span_panel.const import DEFAULT_SCAN_INTERVAL
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval("invalid")
     assert result == int(DEFAULT_SCAN_INTERVAL.total_seconds())
@@ -89,7 +85,7 @@ def test_validate_scan_interval_with_invalid_string():
 
 def test_validate_scan_interval_with_very_large_value():
     """Test validation with very large value."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval(999999)
     assert result == 999999  # Should accept large values
@@ -97,10 +93,8 @@ def test_validate_scan_interval_with_very_large_value():
 
 def test_validate_scan_interval_with_empty_string():
     """Test validation with empty string (should return default)."""
-    from custom_components.span_panel.const import (
-        validate_scan_interval,
-        DEFAULT_SCAN_INTERVAL,
-    )
+    from custom_components.span_panel.const import DEFAULT_SCAN_INTERVAL
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval("")
     assert result == int(DEFAULT_SCAN_INTERVAL.total_seconds())
@@ -115,7 +109,7 @@ def test_minimum_scan_interval_constant():
 
 def test_validate_scan_interval_edge_case_negative_float():
     """Test validation with negative float."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval(-5.5)
     assert result == 5  # Should clamp to minimum
@@ -123,7 +117,7 @@ def test_validate_scan_interval_edge_case_negative_float():
 
 def test_validate_scan_interval_edge_case_zero_string():
     """Test validation with string "0"."""
-    from custom_components.span_panel.const import validate_scan_interval
+    from custom_components.span_panel.helpers import validate_scan_interval
 
     result = validate_scan_interval("0")
     assert result == 5  # Should clamp to minimum

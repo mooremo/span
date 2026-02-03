@@ -28,10 +28,10 @@ from .const import (
     DOMAIN,
     USE_CIRCUIT_NUMBERS,
     USE_DEVICE_PREFIX,
-    validate_scan_interval,
 )
 from .entity_id_naming_patterns import EntityIdMigrationManager
 from .exceptions import SpanPanelSimulationOfflineError
+from .helpers import validate_scan_interval
 from .options import ENERGY_REPORTING_GRACE_PERIOD
 from .span_panel import SpanPanel
 

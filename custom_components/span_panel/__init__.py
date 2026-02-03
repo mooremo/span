@@ -29,9 +29,9 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     NAME,
-    validate_scan_interval,
 )
 from .coordinator import SpanPanelCoordinator
+from .helpers import validate_scan_interval
 from .migration import migrate_config_entry_sensors
 
 # Handle solar options changes before reload (battery is now native sensor)
