@@ -217,20 +217,28 @@ class SpanPanelCircuitsSwitch(CoordinatorEntity[SpanPanelCoordinator], SwitchEnt
         """Turn the switch on."""
         try:
             span_panel: SpanPanel = self.coordinator.data
-            circuits: dict[str, SpanPanelCircuit] = (
-                span_panel.circuits
-            )  # Get atomic snapshot of circuits
-            if self._circuit_id in circuits:
-                # Create a copy of the circuit for the operation
+            circuits: dict[str, SpanPanelCircuit] = span_panel.circuits
+
+            # Atomic get-and-copy to avoid race condition
+            try:
                 curr_circuit: SpanPanelCircuit = circuits[self._circuit_id].copy()
-                # Perform the state change
-                await span_panel.api.set_relay(curr_circuit, CircuitRelayState.CLOSED)
-                # Optimistically update local state to prevent UI bouncing
-                self._attr_is_on = True
-                if self.hass is not None:
-                    self.async_write_ha_state()
-                # Request refresh to get the actual new state from panel
-                await self.coordinator.async_request_refresh()
+            except KeyError:
+                _LOGGER.warning(
+                    "Circuit %s (%s) not found in panel data during turn_on. "
+                    "Circuit may have been removed or panel data is stale.",
+                    self._circuit_id,
+                    self._attr_name or "unnamed",
+                )
+                return
+
+            # Perform the state change
+            await span_panel.api.set_relay(curr_circuit, CircuitRelayState.CLOSED)
+            # Optimistically update local state to prevent UI bouncing
+            self._attr_is_on = True
+            if self.hass is not None:
+                self.async_write_ha_state()
+            # Request refresh to get the actual new state from panel
+            await self.coordinator.async_request_refresh()
         except Exception as err:
             _LOGGER.error(
                 "Failed to turn on switch for circuit_id=%s (%s): %s",
@@ -246,21 +254,29 @@ class SpanPanelCircuitsSwitch(CoordinatorEntity[SpanPanelCoordinator], SwitchEnt
         """Turn the switch off."""
         try:
             span_panel: SpanPanel = self.coordinator.data
-            circuits: dict[str, SpanPanelCircuit] = (
-                span_panel.circuits
-            )  # Get atomic snapshot of circuits
-            if self._circuit_id in circuits:
-                # Create a copy of the circuit for the operation
+            circuits: dict[str, SpanPanelCircuit] = span_panel.circuits
+
+            # Atomic get-and-copy to avoid race condition
+            try:
                 curr_circuit: SpanPanelCircuit = circuits[self._circuit_id].copy()
-                # Perform the state change
-                await span_panel.api.set_relay(curr_circuit, CircuitRelayState.OPEN)
-                # Optimistically update local state to prevent UI bouncing
-                self._attr_is_on = False
-                # Only write state if hass is available
-                if self.hass is not None:
-                    self.async_write_ha_state()
-                # Request refresh to get the actual new state from panel
-                await self.coordinator.async_request_refresh()
+            except KeyError:
+                _LOGGER.warning(
+                    "Circuit %s (%s) not found in panel data during turn_off. "
+                    "Circuit may have been removed or panel data is stale.",
+                    self._circuit_id,
+                    self._attr_name or "unnamed",
+                )
+                return
+
+            # Perform the state change
+            await span_panel.api.set_relay(curr_circuit, CircuitRelayState.OPEN)
+            # Optimistically update local state to prevent UI bouncing
+            self._attr_is_on = False
+            # Only write state if hass is available
+            if self.hass is not None:
+                self.async_write_ha_state()
+            # Request refresh to get the actual new state from panel
+            await self.coordinator.async_request_refresh()
         except Exception as err:
             _LOGGER.error(
                 "Failed to turn off switch for circuit_id=%s (%s): %s",
