@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import datetime
+from enum import Enum
 import logging
 import os
 from typing import Any
@@ -34,6 +35,15 @@ from .span_panel_hardware_status import SpanPanelHardwareStatus
 from .span_panel_storage_battery import SpanPanelStorageBattery
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+class ClientState(Enum):
+    """API client lifecycle states."""
+
+    NOT_CREATED = "not_created"  # Client hasn't been created yet
+    ACTIVE = "active"  # Client created and usable
+    CLOSING = "closing"  # Close operation in progress
+    CLOSED = "closed"  # Client explicitly closed, cannot be recreated
 
 
 class SpanPanelApi:
@@ -86,6 +96,20 @@ class SpanPanelApi:
 
         # Initialize client as None - will be created in setup()
         self._client: SpanPanelClient | None = None
+        self._client_state: ClientState = ClientState.NOT_CREATED
+
+    async def __aenter__(self) -> "SpanPanelApi":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        """Async context manager exit - ensure cleanup."""
+        await self.close()
 
     def _is_panel_offline(self) -> bool:
         """Check if the panel should be offline based on simulation settings.
@@ -204,29 +228,36 @@ class SpanPanelApi:
             self._authenticated = True
 
     def _ensure_client_open(self) -> None:
-        # Check if client was explicitly closed (None and we've tried to create it before)
-        if self._client is None and hasattr(self, "_client_created"):
+        """Ensure client is open and ready for use.
+
+        Uses explicit ClientState tracking instead of fragile attribute checks.
+        """
+        # Check if client was explicitly closed
+        if self._client_state == ClientState.CLOSED:
             _LOGGER.debug(
                 "[SpanPanelApi] Client was closed, cannot recreate after explicit close for host=%s",
                 self.host,
             )
             raise SpanPanelAPIError("API client has been closed")
 
-        # Create client if it doesn't exist yet
-        if self._client is None:
+        # Create client if it hasn't been created yet
+        if self._client_state == ClientState.NOT_CREATED:
             self._create_client()
-            self._client_created = True
+            self._client_state = ClientState.ACTIVE
             return
 
-        client_obj = getattr(self._client, "_client", None)
-        if client_obj is not None and getattr(client_obj, "is_closed", False):
-            _LOGGER.debug(
-                "[SpanPanelApi] Underlying httpx client is closed for host=%s (SSL=%s), will be recreated on next use",
-                self.host,
-                self.use_ssl,
-            )
-            # Let the SpanPanelClient handle closed connections internally
-            # Don't interfere with its connection management - it will create new connections as needed
+        # Client exists and is active - check if underlying connection is still valid
+        if self._client_state == ClientState.ACTIVE:
+            client_obj = getattr(self._client, "_client", None)
+            if client_obj is not None and getattr(client_obj, "is_closed", False):
+                _LOGGER.debug(
+                    "[SpanPanelApi] Underlying httpx client is closed for host=%s (SSL=%s), "
+                    "will be recreated on next use",
+                    self.host,
+                    self.use_ssl,
+                )
+                # Let the SpanPanelClient handle closed connections internally
+                # Don't interfere with its connection management
 
     def _debug_check_client(self, method_name: str) -> None:
         # Check if the client is in a closed or invalid state
@@ -655,8 +686,20 @@ class SpanPanelApi:
             raise
 
     async def close(self) -> None:
-        """Close the API client and clean up resources."""
+        """Close the API client and clean up resources.
+
+        Uses ClientState to track closure and prevent use-after-close bugs.
+        """
+        if self._client_state in (ClientState.CLOSED, ClientState.CLOSING):
+            _LOGGER.debug(
+                "[SpanPanelApi] Client already closed/closing for host=%s",
+                self.host,
+            )
+            return
+
         _LOGGER.debug("[SpanPanelApi] Closing API client for host=%s", self.host)
+        self._client_state = ClientState.CLOSING
+
         if self._client is not None:
             try:
                 await self._client.close()
@@ -665,6 +708,7 @@ class SpanPanelApi:
             finally:
                 # Reset client reference to prevent further use
                 self._client = None
+                self._client_state = ClientState.CLOSED
 
 
 # Re-export items that are imported by __init__.py

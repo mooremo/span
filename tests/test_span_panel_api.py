@@ -101,9 +101,11 @@ async def test_ping_with_auth_failure():
 
 
 def test_ensure_client_open_client_none():
+    from custom_components.span_panel.span_panel_api import ClientState
+
     api = SpanPanelApi("host")
     api._client = None
-    api._client_created = True  # Mark as previously created and closed
+    api._client_state = ClientState.CLOSED  # Mark as explicitly closed
     with pytest.raises(SpanPanelAPIError, match="API client has been closed"):
         api._ensure_client_open()
 
@@ -261,9 +263,11 @@ async def test_set_priority():
 
 @pytest.mark.asyncio
 async def test_api_error_handling():
+    from custom_components.span_panel.span_panel_api import ClientState
+
     api = SpanPanelApi("host")
     api._client = None
-    api._client_created = True  # Mark as previously created and closed
+    api._client_state = ClientState.CLOSED  # Mark as explicitly closed
 
     with pytest.raises(SpanPanelAPIError, match="API client has been closed"):
         await api.get_status_data()
@@ -277,6 +281,8 @@ async def test_api_error_handling():
 
 @pytest.mark.asyncio
 async def test_ensure_client_open_with_closed_client():
+    from custom_components.span_panel.span_panel_api import ClientState
+
     api = SpanPanelApi("host")
     # Mock a client with closed underlying httpx client
     mock_client = MagicMock()
@@ -284,6 +290,7 @@ async def test_ensure_client_open_with_closed_client():
     mock_httpx_client.is_closed = True
     mock_client._client = mock_httpx_client
     api._client = mock_client
+    api._client_state = ClientState.ACTIVE
 
     # The method should not create a new client when underlying httpx is closed
     # It just logs a message and lets SpanPanelClient handle it internally
@@ -296,6 +303,7 @@ async def test_ensure_client_open_with_closed_client():
 @pytest.mark.asyncio
 async def test_ensure_client_open_with_options():
     from custom_components.span_panel.options import Options
+    from custom_components.span_panel.span_panel_api import ClientState
 
     # Create mock config entry
     mock_entry = MagicMock()
@@ -313,6 +321,7 @@ async def test_ensure_client_open_with_options():
     mock_httpx_client.is_closed = True
     mock_client._client = mock_httpx_client
     api._client = mock_client
+    api._client_state = ClientState.ACTIVE
 
     # The method should not create a new client when underlying httpx is closed
     # It just logs a message and lets SpanPanelClient handle it internally
@@ -324,6 +333,8 @@ async def test_ensure_client_open_with_options():
 
 @pytest.mark.asyncio
 async def test_ensure_client_open_with_access_token():
+    from custom_components.span_panel.span_panel_api import ClientState
+
     api = SpanPanelApi("host", access_token="test_token")
     # Mock a client with closed underlying httpx client
     mock_client = MagicMock()
@@ -331,6 +342,7 @@ async def test_ensure_client_open_with_access_token():
     mock_httpx_client.is_closed = True
     mock_client._client = mock_httpx_client
     api._client = mock_client
+    api._client_state = ClientState.ACTIVE
 
     # The method should not create a new client when underlying httpx is closed
     # It just logs a message and lets SpanPanelClient handle it internally
