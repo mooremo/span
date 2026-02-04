@@ -859,3 +859,63 @@ class TestHelperFunctions:
             unique_id="test_unique_id",
         )
         assert result == "sensor.existing_solar_current_power"
+
+
+class TestFriendlyNameFunctions:
+    """Tests for friendly name construction functions (Sub-Phase 4.4.1)."""
+
+    def test_construct_friendly_name_with_string(self):
+        """Test construct_friendly_name with string value."""
+        from custom_components.span_panel.helpers import construct_friendly_name
+
+        result = construct_friendly_name("Test Name")
+        assert result == "Test Name"
+
+    def test_construct_friendly_name_with_none(self):
+        """Test construct_friendly_name with None value."""
+        from custom_components.span_panel.helpers import construct_friendly_name
+
+        result = construct_friendly_name(None)
+        assert result == ""
+
+    def test_construct_friendly_name_with_empty_string(self):
+        """Test construct_friendly_name with empty string."""
+        from custom_components.span_panel.helpers import construct_friendly_name
+
+        result = construct_friendly_name("")
+        assert result == ""
+
+    def test_construct_friendly_name_with_number(self):
+        """Test construct_friendly_name with number."""
+        from custom_components.span_panel.helpers import construct_friendly_name
+
+        result = construct_friendly_name(42)
+        assert result == "42"
+
+    def test_construct_panel_friendly_name_with_string(self):
+        """Test construct_panel_friendly_name with string value."""
+        import warnings
+
+        from custom_components.span_panel.helpers import construct_panel_friendly_name
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = construct_panel_friendly_name("Test Panel")
+            assert result == "Test Panel"
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "construct_panel_friendly_name is deprecated" in str(w[0].message)
+
+    def test_construct_status_friendly_name_with_string(self):
+        """Test construct_status_friendly_name with string value (deprecated)."""
+        import warnings
+
+        from custom_components.span_panel.helpers import construct_status_friendly_name
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = construct_status_friendly_name("Test Status")
+            assert result == "Test Status"
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "construct_status_friendly_name is deprecated" in str(w[0].message)

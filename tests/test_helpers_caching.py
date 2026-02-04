@@ -25,7 +25,7 @@ def test_reverse_suffix_mapping_constant_exists():
 
 def test_reverse_mapping_contains_all_entries():
     """Test that reverse mapping contains all forward mapping entries."""
-    from custom_components.span_panel.helpers import (
+    from custom_components.span_panel.constants.suffix_mappings import (
         _REVERSE_SUFFIX_MAPPING,
         CIRCUIT_SUFFIX_MAPPING,
         PANEL_SUFFIX_MAPPING,
@@ -56,10 +56,8 @@ def test_get_api_description_key_from_suffix_basic():
 
 def test_get_api_description_key_from_suffix_circuit_mapping():
     """Test circuit suffix mappings."""
-    from custom_components.span_panel.helpers import (
-        get_api_description_key_from_suffix,
-        CIRCUIT_SUFFIX_MAPPING,
-    )
+    from custom_components.span_panel.helpers import get_api_description_key_from_suffix
+    from custom_components.span_panel.constants.suffix_mappings import CIRCUIT_SUFFIX_MAPPING
 
     # Test a few known circuit mappings
     for api_key, suffix in CIRCUIT_SUFFIX_MAPPING.items():
@@ -69,10 +67,8 @@ def test_get_api_description_key_from_suffix_circuit_mapping():
 
 def test_get_api_description_key_from_suffix_panel_mapping():
     """Test panel suffix mappings."""
-    from custom_components.span_panel.helpers import (
-        get_api_description_key_from_suffix,
-        PANEL_SUFFIX_MAPPING,
-    )
+    from custom_components.span_panel.helpers import get_api_description_key_from_suffix
+    from custom_components.span_panel.constants.suffix_mappings import PANEL_SUFFIX_MAPPING
 
     # Test panel mappings
     for api_key, suffix in PANEL_SUFFIX_MAPPING.items():
@@ -82,10 +78,8 @@ def test_get_api_description_key_from_suffix_panel_mapping():
 
 def test_get_api_description_key_from_suffix_panel_entity_priority():
     """Test that panel entity mappings take precedence."""
-    from custom_components.span_panel.helpers import (
-        get_api_description_key_from_suffix,
-        PANEL_ENTITY_SUFFIX_MAPPING,
-    )
+    from custom_components.span_panel.helpers import get_api_description_key_from_suffix
+    from custom_components.span_panel.constants.suffix_mappings import PANEL_ENTITY_SUFFIX_MAPPING
 
     # Panel entity mappings should override others
     for api_key, suffix in PANEL_ENTITY_SUFFIX_MAPPING.items():
@@ -111,8 +105,8 @@ def test_get_api_description_key_from_suffix_empty_string():
 
 def test_reverse_mapping_performance():
     """Benchmark test: cached mapping should be significantly faster."""
-    from custom_components.span_panel.helpers import (
-        get_api_description_key_from_suffix,
+    from custom_components.span_panel.helpers import get_api_description_key_from_suffix
+    from custom_components.span_panel.constants.suffix_mappings import (
         CIRCUIT_SUFFIX_MAPPING,
         PANEL_SUFFIX_MAPPING,
         PANEL_ENTITY_SUFFIX_MAPPING,
@@ -142,8 +136,8 @@ def test_reverse_mapping_performance():
 
 def test_reverse_mapping_correctness_comprehensive():
     """Comprehensive test that all mappings are correctly reversed."""
-    from custom_components.span_panel.helpers import (
-        get_api_description_key_from_suffix,
+    from custom_components.span_panel.helpers import get_api_description_key_from_suffix
+    from custom_components.span_panel.constants.suffix_mappings import (
         CIRCUIT_SUFFIX_MAPPING,
         PANEL_SUFFIX_MAPPING,
         PANEL_ENTITY_SUFFIX_MAPPING,

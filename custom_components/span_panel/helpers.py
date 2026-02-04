@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import TYPE_CHECKING, Any
+import warnings
 
 from homeassistant.components.persistent_notification import async_create
 from homeassistant.const import CONF_HOST
@@ -18,6 +19,11 @@ from .const import (
     MINIMUM_SCAN_INTERVAL,
     USE_CIRCUIT_NUMBERS,
     USE_DEVICE_PREFIX,
+)
+from .constants.suffix_mappings import (
+    _REVERSE_SUFFIX_MAPPING,
+    ALL_SUFFIX_MAPPINGS,
+    PANEL_ENTITY_SUFFIX_MAPPING,
 )
 from .span_panel import SpanPanel
 from .util import panel_to_device_info
@@ -64,74 +70,6 @@ def validate_scan_interval(raw_value: Any) -> int:
         return MINIMUM_SCAN_INTERVAL
 
     return scan_interval_seconds
-
-
-# Global suffix mappings for API description keys to user-friendly/entity suffixes
-# These mappings drive consistent unique_id/entity_id suffixes across all sensors,
-# including Net Energy and import/export flows, and are used for reverse lookups.
-
-# Circuit sensor API field mappings (used by get_user_friendly_suffix)
-# Includes power, produced/consumed, net energy, and import/export energy
-CIRCUIT_SUFFIX_MAPPING = {
-    "instantPowerW": "power",
-    "producedEnergyWh": "energy_produced",
-    "consumedEnergyWh": "energy_consumed",
-    "netEnergyWh": "energy_net",
-    "importedEnergyWh": "energy_imported",
-    "exportedEnergyWh": "energy_exported",
-    "circuit_priority": "priority",
-}
-
-# Panel sensor API field mappings (used by get_user_friendly_suffix)
-# Includes main meter/feedthrough produced, consumed, and net energy
-PANEL_SUFFIX_MAPPING = {
-    "instantGridPowerW": "grid_power",  # Descriptive to differentiate from other power types
-    "feedthroughPowerW": "feed_through_power",
-    "mainMeterEnergyProducedWh": "main_meter_energy_produced",  # Consistent naming
-    "mainMeterEnergyConsumedWh": "main_meter_energy_consumed",  # Consistent naming
-    "mainMeterNetEnergyWh": "main_meter_energy_net",  # Consistent naming
-    "feedthroughEnergyProducedWh": "feed_through_energy_produced",  # Consistent naming
-    "feedthroughEnergyConsumedWh": "feed_through_energy_consumed",  # Consistent naming
-    "feedthroughNetEnergyWh": "feed_through_energy_net",  # Consistent naming
-    "batteryPercentage": "battery_percentage",
-    "dsmState": "dsm_state",
-}
-
-# Panel entity suffix mappings (used by get_panel_entity_suffix)
-# These are the actual entity_id/unique_id suffixes used for panel sensors
-# (e.g., "main_meter_net_energy" / "feed_through_net_energy").
-PANEL_ENTITY_SUFFIX_MAPPING = {
-    "instantGridPowerW": "current_power",
-    "feedthroughPowerW": "feed_through_power",
-    "mainMeterEnergyProducedWh": "main_meter_produced_energy",
-    "mainMeterEnergyConsumedWh": "main_meter_consumed_energy",
-    "mainMeterNetEnergyWh": "main_meter_net_energy",
-    "feedthroughEnergyProducedWh": "feed_through_produced_energy",
-    "feedthroughEnergyConsumedWh": "feed_through_consumed_energy",
-    "feedthroughNetEnergyWh": "feed_through_net_energy",
-    "batteryPercentage": "battery_level",
-    "dsmState": "dsm_state",
-}
-
-# Combined mapping for general suffix lookup
-ALL_SUFFIX_MAPPINGS = {**CIRCUIT_SUFFIX_MAPPING, **PANEL_SUFFIX_MAPPING}
-
-
-# Pre-computed reverse mapping for O(1) lookup performance
-# Built once at module load time instead of rebuilding on every function call
-_REVERSE_SUFFIX_MAPPING: dict[str, str] = {}
-
-# Add circuit suffix mappings
-for _api_key, _user_suffix in CIRCUIT_SUFFIX_MAPPING.items():
-    _REVERSE_SUFFIX_MAPPING[_user_suffix] = _api_key
-
-# Add panel suffix mappings
-for _api_key, _user_suffix in PANEL_SUFFIX_MAPPING.items():
-    _REVERSE_SUFFIX_MAPPING[_user_suffix] = _api_key
-
-# Add panel entity suffix mappings (these take precedence for panel sensors)
-for _api_key, _entity_suffix in PANEL_ENTITY_SUFFIX_MAPPING.items():
-    _REVERSE_SUFFIX_MAPPING[_entity_suffix] = _api_key
 
 
 def get_api_description_key_from_suffix(suffix: str) -> str | None:
@@ -1307,8 +1245,36 @@ def construct_unmapped_friendly_name(
     return f"Unmapped Tab {circuit_number} {sensor_description_name}"
 
 
+def construct_friendly_name(description_name: Any) -> str:
+    """Construct friendly name for sensors (consolidated function).
+
+    Works for panel-level, status, and other sensors.
+    Converts description to string, returns empty string for None/empty values.
+
+    Args:
+        description_name: The sensor description name (can be str, int, None, or UndefinedType)
+
+    Returns:
+        String representation or empty string
+
+    Examples:
+        >>> construct_friendly_name("Main Panel")
+        'Main Panel'
+        >>> construct_friendly_name(None)
+        ''
+        >>> construct_friendly_name(42)
+        '42'
+
+    """
+    return str(description_name) if description_name else ""
+
+
 def construct_panel_friendly_name(description_name: Any) -> str:
     """Construct friendly name for panel-level sensors.
+
+    .. deprecated::
+        Use :func:`construct_friendly_name` instead.
+        This function will be removed in Phase 5 (version 2.0).
 
     Args:
         description_name: The sensor description name (can be str, None, or UndefinedType)
@@ -1317,12 +1283,21 @@ def construct_panel_friendly_name(description_name: Any) -> str:
         Friendly name string
 
     """
-    return str(description_name) if description_name else ""
+    warnings.warn(
+        "construct_panel_friendly_name is deprecated, use construct_friendly_name instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return construct_friendly_name(description_name)
 
 
 def construct_status_friendly_name(description_name: Any) -> str:
     """Construct friendly name for status sensors.
 
+    .. deprecated::
+        Use :func:`construct_friendly_name` instead.
+        This function will be removed in Phase 5 (version 2.0).
+
     Args:
         description_name: The sensor description name (can be str, None, or UndefinedType)
 
@@ -1330,7 +1305,12 @@ def construct_status_friendly_name(description_name: Any) -> str:
         Friendly name string
 
     """
-    return str(description_name) if description_name else ""
+    warnings.warn(
+        "construct_status_friendly_name is deprecated, use construct_friendly_name instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return construct_friendly_name(description_name)
 
 
 async def async_create_span_notification(
