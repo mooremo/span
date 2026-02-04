@@ -7,3 +7,7 @@ class SpanPanelReturnedEmptyData(Exception):
 
 class SpanPanelSimulationOfflineError(Exception):
     """Exception raised when the panel is intentionally offline in simulation mode."""
+
+
+class ConfigFlowError(Exception):
+    """Custom exception for config flow internal errors."""

@@ -65,6 +65,7 @@ from .const import (
     USE_DEVICE_PREFIX,
     EntityNamingPattern,
 )
+from .exceptions import ConfigFlowError
 from .helpers import generate_unique_simulator_serial_number
 from .options import (
     BATTERY_ENABLE,
@@ -86,10 +87,6 @@ _LOGGER = logging.getLogger(__name__)
 SIM_FILE_KEY = "simulation_config_file"
 SIM_EXPORT_PATH = "simulation_export_path"
 SIM_IMPORT_PATH = "simulation_import_path"
-
-
-class ConfigFlowError(Exception):
-    """Custom exception for config flow internal errors."""
 
 
 if TYPE_CHECKING:
