@@ -289,7 +289,8 @@ class TestServiceRegistration:
     async def test_service_not_registered_twice(self, mock_hass):
         """Test that the service is not registered if it already exists."""
         # Simulate service already registered via hass.data flag
-        mock_hass.data[f"{DOMAIN}_cleanup_service_registered"] = True
+        # Note: Flag name changed with base.register_span_service() refactoring
+        mock_hass.data[f"{DOMAIN}_{SERVICE_CLEANUP_ENERGY_SPIKES}_registered"] = True
 
         await async_setup_cleanup_energy_spikes_service(mock_hass)
 

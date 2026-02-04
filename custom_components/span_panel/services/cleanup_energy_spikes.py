@@ -18,21 +18,20 @@ from typing import Any, Literal
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.components.sensor import SensorStateClass
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from ..const import DOMAIN
+from .base import register_span_service
 
 _LOGGER = logging.getLogger(__name__)
 
 # Service name
 SERVICE_CLEANUP_ENERGY_SPIKES = "cleanup_energy_spikes"
 
-# Lock for thread-safe service registration
-_registration_lock = asyncio.Lock()
 
 # Service schema
 SERVICE_CLEANUP_ENERGY_SPIKES_SCHEMA = vol.Schema(
@@ -47,71 +46,41 @@ SERVICE_CLEANUP_ENERGY_SPIKES_SCHEMA = vol.Schema(
 
 
 async def async_setup_cleanup_energy_spikes_service(hass: HomeAssistant) -> None:
-    """Register the cleanup_energy_spikes service.
+    """Register the cleanup_energy_spikes service."""
 
-    This function is safe to call multiple times (e.g., for multi-panel setups).
-    The service will only be registered once.
-    """
-    # Guard against multiple registrations for multi-panel setups
-    # Use hass.data flag instead of has_service to avoid interfering with service metadata
-    service_key = f"{DOMAIN}_cleanup_service_registered"
+    async def handle_cleanup_energy_spikes(call: ServiceCall) -> dict[str, Any]:
+        """Handle the service call."""
+        _LOGGER.info("Service called with data: %s", call.data)
+        config_entry_id = call.data["config_entry_id"]
+        start_time = call.data["start_time"]
+        end_time = call.data["end_time"]
+        dry_run = call.data.get("dry_run", True)
+        main_meter_entity_id = call.data.get("main_meter_entity_id")
+        _LOGGER.info(
+            "Parsed values: config_entry_id=%s, start_time=%s, end_time=%s, dry_run=%s, main_meter_entity_id=%s",
+            config_entry_id,
+            start_time,
+            end_time,
+            dry_run,
+            main_meter_entity_id,
+        )
 
-    # Use lock to prevent race condition in concurrent multi-panel setups
-    async with _registration_lock:
-        # Check again inside lock (double-check pattern)
-        if hass.data.get(service_key):
-            _LOGGER.debug(
-                "Service %s.%s already registered, skipping",
-                DOMAIN,
-                SERVICE_CLEANUP_ENERGY_SPIKES,
-            )
-            return
+        return await cleanup_energy_spikes(
+            hass,
+            config_entry_id=config_entry_id,
+            start_time=start_time,
+            end_time=end_time,
+            dry_run=dry_run,
+            main_meter_entity_id=main_meter_entity_id,
+        )
 
-        async def handle_cleanup_energy_spikes(call: ServiceCall) -> dict[str, Any]:
-            """Handle the service call."""
-            _LOGGER.info("Service called with data: %s", call.data)
-            config_entry_id = call.data["config_entry_id"]
-            start_time = call.data["start_time"]
-            end_time = call.data["end_time"]
-            dry_run = call.data.get("dry_run", True)
-            main_meter_entity_id = call.data.get("main_meter_entity_id")
-            _LOGGER.info(
-                "Parsed values: config_entry_id=%s, start_time=%s, end_time=%s, dry_run=%s, main_meter_entity_id=%s",
-                config_entry_id,
-                start_time,
-                end_time,
-                dry_run,
-                main_meter_entity_id,
-            )
-
-            return await cleanup_energy_spikes(
-                hass,
-                config_entry_id=config_entry_id,
-                start_time=start_time,
-                end_time=end_time,
-                dry_run=dry_run,
-                main_meter_entity_id=main_meter_entity_id,
-            )
-
-        try:
-            hass.services.async_register(
-                DOMAIN,
-                SERVICE_CLEANUP_ENERGY_SPIKES,
-                handle_cleanup_energy_spikes,
-                schema=SERVICE_CLEANUP_ENERGY_SPIKES_SCHEMA,
-                supports_response=SupportsResponse.OPTIONAL,
-            )
-            # Only set flag after successful registration
-            hass.data[service_key] = True
-            _LOGGER.debug("Registered %s.%s service", DOMAIN, SERVICE_CLEANUP_ENERGY_SPIKES)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to register %s.%s service: %s",
-                DOMAIN,
-                SERVICE_CLEANUP_ENERGY_SPIKES,
-                e,
-            )
-            raise
+    await register_span_service(
+        hass=hass,
+        service_name=SERVICE_CLEANUP_ENERGY_SPIKES,
+        handler=handle_cleanup_energy_spikes,
+        schema=SERVICE_CLEANUP_ENERGY_SPIKES_SCHEMA,
+        domain=DOMAIN,
+    )
 
 
 async def cleanup_energy_spikes(

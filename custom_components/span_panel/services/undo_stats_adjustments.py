@@ -8,7 +8,6 @@ create adjustments for testing purposes. It supports two modes:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta
 import json
 import logging
@@ -16,20 +15,18 @@ from typing import Any
 
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import statistics_during_period
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from ..const import DOMAIN
+from .base import register_span_service
 
 _LOGGER = logging.getLogger(__name__)
 
 # Service name
 SERVICE_UNDO_STATS_ADJUSTMENTS = "undo_stats_adjustments"
-
-# Lock for thread-safe service registration
-_registration_lock = asyncio.Lock()
 
 # Service schema - accepts either direct parameters OR cleanup result JSON
 SERVICE_UNDO_STATS_ADJUSTMENTS_SCHEMA = vol.Schema(
@@ -46,81 +43,52 @@ SERVICE_UNDO_STATS_ADJUSTMENTS_SCHEMA = vol.Schema(
 
 
 async def async_setup_undo_stats_adjustments_service(hass: HomeAssistant) -> None:
-    """Register the undo_stats_adjustments service.
+    """Register the undo_stats_adjustments service."""
 
-    This function is safe to call multiple times.
-    The service will only be registered once.
-    """
-    # Guard against multiple registrations
-    service_key = f"{DOMAIN}_undo_stats_adjustments_service_registered"
+    async def handle_undo_stats_adjustments(call: ServiceCall) -> dict[str, Any]:
+        """Handle the service call."""
+        cleanup_result = call.data.get("cleanup_result")
 
-    # Use lock to prevent race condition in concurrent multi-panel setups
-    async with _registration_lock:
-        # Check again inside lock (double-check pattern)
-        if hass.data.get(service_key):
-            _LOGGER.debug(
-                "Service %s.%s already registered, skipping",
-                DOMAIN,
-                SERVICE_UNDO_STATS_ADJUSTMENTS,
-            )
-            return
+        # If cleanup_result is provided, reverse those adjustments
+        if cleanup_result:
+            # Parse if it's a JSON string
+            if isinstance(cleanup_result, str):
+                try:
+                    cleanup_result = json.loads(cleanup_result)
+                except json.JSONDecodeError as e:
+                    _LOGGER.error("Invalid JSON in cleanup_result: %s", e)
+                    return {
+                        "success": False,
+                        "error": f"Invalid JSON in cleanup_result: {e}",
+                    }
 
-        async def handle_undo_stats_adjustments(call: ServiceCall) -> dict[str, Any]:
-            """Handle the service call."""
-            cleanup_result = call.data.get("cleanup_result")
+            return await reverse_cleanup_adjustments(hass, cleanup_result)
 
-            # If cleanup_result is provided, reverse those adjustments
-            if cleanup_result:
-                # Parse if it's a JSON string
-                if isinstance(cleanup_result, str):
-                    try:
-                        cleanup_result = json.loads(cleanup_result)
-                    except json.JSONDecodeError as e:
-                        _LOGGER.error("Invalid JSON in cleanup_result: %s", e)
-                        return {
-                            "success": False,
-                            "error": f"Invalid JSON in cleanup_result: {e}",
-                        }
+        # Otherwise, use direct parameters for manual simulation
+        entity_id = call.data.get("entity_id")
+        reset_time = call.data.get("reset_time")
+        adjustment_wh = call.data.get("adjustment_wh")
 
-                return await reverse_cleanup_adjustments(hass, cleanup_result)
+        if not entity_id or not reset_time:
+            return {
+                "success": False,
+                "error": "Either 'cleanup_result' or both 'entity_id' and 'reset_time' must be provided",
+            }
 
-            # Otherwise, use direct parameters for manual simulation
-            entity_id = call.data.get("entity_id")
-            reset_time = call.data.get("reset_time")
-            adjustment_wh = call.data.get("adjustment_wh")
+        return await simulate_firmware_reset(
+            hass,
+            entity_id=entity_id,
+            reset_time=reset_time,
+            adjustment_wh=adjustment_wh,
+        )
 
-            if not entity_id or not reset_time:
-                return {
-                    "success": False,
-                    "error": "Either 'cleanup_result' or both 'entity_id' and 'reset_time' must be provided",
-                }
-
-            return await simulate_firmware_reset(
-                hass,
-                entity_id=entity_id,
-                reset_time=reset_time,
-                adjustment_wh=adjustment_wh,
-            )
-
-        try:
-            hass.services.async_register(
-                DOMAIN,
-                SERVICE_UNDO_STATS_ADJUSTMENTS,
-                handle_undo_stats_adjustments,
-                schema=SERVICE_UNDO_STATS_ADJUSTMENTS_SCHEMA,
-                supports_response=SupportsResponse.OPTIONAL,
-            )
-            # Only set flag after successful registration
-            hass.data[service_key] = True
-            _LOGGER.debug("Registered %s.%s service", DOMAIN, SERVICE_UNDO_STATS_ADJUSTMENTS)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to register %s.%s service: %s",
-                DOMAIN,
-                SERVICE_UNDO_STATS_ADJUSTMENTS,
-                e,
-            )
-            raise
+    await register_span_service(
+        hass=hass,
+        service_name=SERVICE_UNDO_STATS_ADJUSTMENTS,
+        handler=handle_undo_stats_adjustments,
+        schema=SERVICE_UNDO_STATS_ADJUSTMENTS_SCHEMA,
+        domain=DOMAIN,
+    )
 
 
 async def simulate_firmware_reset(
