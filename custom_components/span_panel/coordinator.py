@@ -29,7 +29,7 @@ from .const import (
     USE_CIRCUIT_NUMBERS,
     USE_DEVICE_PREFIX,
 )
-from .entity_id_naming_patterns import EntityIdMigrationManager
+from .entity_id_migration import EntityIdMigrationManager
 from .exceptions import SpanPanelSimulationOfflineError
 from .helpers import validate_scan_interval
 from .options import ENERGY_REPORTING_GRACE_PERIOD
