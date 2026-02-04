@@ -1,109 +1,95 @@
-"""Helper functions for Span Panel integration.
+"""Utility functions package for Span Panel integration.
 
-.. deprecated::
-    This module is deprecated. Import from :mod:`custom_components.span_panel.utilities`
-    instead. This module will be removed in version 2.0.
+This package organizes helper functions by domain:
+- validation: Input validation functions
+- formatting: Friendly name formatting
+- unique_ids: Unique ID construction
+- entity_naming: Entity ID construction
+- sensor_utils: Sensor-related helpers
+- circuit_utils: Circuit-related helpers
+- registry: Entity registry utilities
 
-All functionality has been moved to the utilities package:
-- validation → custom_components.span_panel.utilities.validation
-- formatting → custom_components.span_panel.utilities.formatting
-- unique_ids → custom_components.span_panel.utilities.unique_ids
-- entity_naming → custom_components.span_panel.utilities.entity_naming
-- sensor_utils → custom_components.span_panel.utilities.sensor_utils
-- circuit_utils → custom_components.span_panel.utilities.circuit_utils
-- registry → custom_components.span_panel.utilities.registry
-
-Usage (NEW - preferred):
-    from custom_components.span_panel.utilities import validate_scan_interval
-
-Usage (OLD - deprecated):
-    from custom_components.span_panel.helpers import validate_scan_interval
+Extracted from helpers.py as part of Sub-Phase 5.3.
 """
 
 from __future__ import annotations
 
-import warnings
-
-warnings.warn(
-    "helpers module is deprecated. "
-    "Import from custom_components.span_panel.utilities instead. "
-    "This module will be removed in version 2.0.",
-    DeprecationWarning,
-    stacklevel=2,
+# Circuit utilities
+from .circuit_utils import (
+    construct_tabs_attribute,
+    construct_voltage_attribute,
+    get_circuit_voltage_type,
+    get_panel_voltage_attribute,
+    parse_tabs_attribute,
 )
 
-# Re-export additional modules used by tests for backward compatibility
-# pylint: disable=wrong-import-position,unused-import
-from homeassistant.helpers import entity_registry as er  # noqa: E402, F401
+# Entity naming utilities
+from .entity_naming import (
+    construct_120v_synthetic_entity_id,
+    construct_240v_synthetic_entity_id,
+    construct_entity_id,
+    construct_multi_circuit_entity_id,
+    construct_panel_entity_id,
+    construct_panel_synthetic_entity_id,
+    construct_single_circuit_entity_id,
+    construct_unmapped_circuit_id,
+    construct_unmapped_entity_id,
+    get_circuit_number,
+    get_unmapped_circuit_entity_id,
+)
 
-from .constants.suffix_mappings import _REVERSE_SUFFIX_MAPPING  # noqa: E402, F401
-from .util import panel_to_device_info  # noqa: E402, F401
+# Formatting utilities
+from .formatting import (
+    construct_friendly_name,
+    construct_panel_friendly_name,
+    construct_status_friendly_name,
+    construct_unmapped_friendly_name,
+)
 
-# Re-export everything from utilities for backward compatibility
-from .utilities import (  # noqa: E402
+# Registry utilities
+from .registry import (
     async_create_span_notification,
+    get_friendly_name_from_registry,
+)
+
+# Sensor utilities
+from .sensor_utils import (
+    extract_solar_info_from_sensor_key,
+    get_api_description_key_from_suffix,
+    get_suffix_from_sensor_key,
+    is_panel_level_sensor_key,
+    is_solar_sensor_key,
+)
+
+# Unique ID utilities
+from .unique_ids import (
     build_binary_sensor_unique_id,
     build_binary_sensor_unique_id_for_entry,
-    # Unique IDs - Pure build functions
     build_circuit_unique_id,
     build_panel_unique_id,
     build_select_unique_id,
     build_select_unique_id_for_entry,
     build_switch_unique_id,
     build_switch_unique_id_for_entry,
-    construct_120v_synthetic_entity_id,
-    construct_240v_synthetic_entity_id,
     construct_binary_sensor_unique_id,
-    # Unique IDs - SpanPanel-based constructors
     construct_circuit_unique_id,
     construct_circuit_unique_id_for_entry,
-    # Entity naming
-    construct_entity_id,
-    # Formatting
-    construct_friendly_name,
-    construct_multi_circuit_entity_id,
-    construct_panel_entity_id,
-    construct_panel_friendly_name,
-    construct_panel_synthetic_entity_id,
     construct_panel_unique_id,
-    # Unique IDs - Entry-based constructors
     construct_panel_unique_id_for_entry,
     construct_select_unique_id,
     construct_sensor_set_id,
-    construct_single_circuit_entity_id,
-    construct_status_friendly_name,
     construct_switch_unique_id,
     construct_synthetic_unique_id,
     construct_synthetic_unique_id_for_entry,
-    # Circuit utilities
-    construct_tabs_attribute,
-    construct_unmapped_circuit_id,
-    construct_unmapped_entity_id,
-    construct_unmapped_friendly_name,
     construct_unmapped_unique_id,
-    construct_voltage_attribute,
-    extract_solar_info_from_sensor_key,
-    # Unique IDs - Simulator helpers
     generate_unique_simulator_serial_number,
-    # Sensor utilities
-    get_api_description_key_from_suffix,
-    get_circuit_number,
-    get_circuit_voltage_type,
     get_device_identifier_for_entry,
-    # Registry utilities
-    get_friendly_name_from_registry,
     get_panel_entity_suffix,
-    get_panel_voltage_attribute,
-    get_suffix_from_sensor_key,
-    get_unmapped_circuit_entity_id,
-    # Unique IDs - Suffix helpers
     get_user_friendly_suffix,
-    is_panel_level_sensor_key,
-    is_solar_sensor_key,
-    parse_tabs_attribute,
-    # Validation
-    validate_scan_interval,
 )
+
+# Validation utilities
+from .validation import validate_scan_interval
 
 __all__ = [
     # Validation
