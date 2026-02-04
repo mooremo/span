@@ -6,7 +6,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from span_panel_api import SpanPanelClient
 import voluptuous as vol
 
-from custom_components.span_panel.const import (
+from ..const import (
     CONF_API_RETRIES,
     CONF_API_RETRY_BACKOFF_MULTIPLIER,
     CONF_API_RETRY_TIMEOUT,
@@ -17,14 +17,13 @@ from custom_components.span_panel.const import (
     ENTITY_NAMING_PATTERN,
     EntityNamingPattern,
 )
-from custom_components.span_panel.options import (
+from ..options import (
     BATTERY_ENABLE,
     ENERGY_REPORTING_GRACE_PERIOD,
     INVERTER_ENABLE,
     INVERTER_LEG1,
     INVERTER_LEG2,
 )
-
 from .options import (
     build_general_options_schema,
     entities_have_device_prefix,

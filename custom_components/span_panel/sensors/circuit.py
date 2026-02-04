@@ -5,18 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from custom_components.span_panel.const import USE_CIRCUIT_NUMBERS
-from custom_components.span_panel.coordinator import SpanPanelCoordinator
-from custom_components.span_panel.helpers import (
+from ..const import USE_CIRCUIT_NUMBERS
+from ..coordinator import SpanPanelCoordinator
+from ..helpers import (
     construct_circuit_unique_id_for_entry,
     construct_tabs_attribute,
     construct_unmapped_friendly_name,
     construct_voltage_attribute,
 )
-from custom_components.span_panel.sensor_definitions import SpanPanelCircuitsSensorEntityDescription
-from custom_components.span_panel.span_panel import SpanPanel
-from custom_components.span_panel.span_panel_circuit import SpanPanelCircuit
-
+from ..sensor_definitions import SpanPanelCircuitsSensorEntityDescription
+from ..span_panel import SpanPanel
+from ..span_panel_circuit import SpanPanelCircuit
 from .base import SpanEnergySensorBase, SpanSensorBase
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

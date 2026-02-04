@@ -16,7 +16,7 @@ from span_panel_api.phase_validation import (
     validate_solar_tabs,
 )
 
-from custom_components.span_panel.const import (
+from ..const import (
     CONFIG_API_RETRIES,
     CONFIG_API_RETRY_BACKOFF_MULTIPLIER,
     CONFIG_API_RETRY_TIMEOUT,

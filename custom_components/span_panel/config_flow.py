@@ -29,10 +29,6 @@ from span_panel_api.simulation import DynamicSimulationEngine, SimulationConfig
 import voluptuous as vol
 import yaml
 
-from custom_components.span_panel.span_panel_hardware_status import (
-    SpanPanelHardwareStatus,
-)
-
 from .config_flow_utils import (
     build_general_options_schema,
     get_available_simulation_configs,
@@ -81,6 +77,7 @@ from .options import (
 )
 from .simulation_utils import clone_panel_to_simulation
 from .span_panel_api import SpanPanelApi
+from .span_panel_hardware_status import SpanPanelHardwareStatus
 
 _LOGGER = logging.getLogger(__name__)
 

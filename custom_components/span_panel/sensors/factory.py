@@ -9,19 +9,19 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.span_panel.const import (
+from ..const import (
     ENABLE_CIRCUIT_NET_ENERGY_SENSORS,
     ENABLE_PANEL_NET_ENERGY_SENSORS,
     ENABLE_SOLAR_NET_ENERGY_SENSORS,
 )
-from custom_components.span_panel.coordinator import SpanPanelCoordinator
-from custom_components.span_panel.options import (
+from ..coordinator import SpanPanelCoordinator
+from ..options import (
     BATTERY_ENABLE,
     INVERTER_ENABLE,
     INVERTER_LEG1,
     INVERTER_LEG2,
 )
-from custom_components.span_panel.sensor_definitions import (
+from ..sensor_definitions import (
     BATTERY_SENSOR,
     CIRCUIT_SENSORS,
     PANEL_DATA_STATUS_SENSORS,
@@ -31,8 +31,7 @@ from custom_components.span_panel.sensor_definitions import (
     STATUS_SENSORS,
     UNMAPPED_SENSORS,
 )
-from custom_components.span_panel.span_panel import SpanPanel
-
+from ..span_panel import SpanPanel
 from .circuit import SpanCircuitEnergySensor, SpanCircuitPowerSensor, SpanUnmappedCircuitSensor
 from .panel import (
     SpanPanelBattery,

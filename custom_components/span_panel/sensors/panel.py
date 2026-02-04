@@ -7,22 +7,21 @@ from typing import Any
 
 from homeassistant.helpers.typing import UNDEFINED
 
-from custom_components.span_panel.coordinator import SpanPanelCoordinator
-from custom_components.span_panel.helpers import (
+from ..coordinator import SpanPanelCoordinator
+from ..helpers import (
     construct_panel_unique_id_for_entry,
     construct_synthetic_unique_id_for_entry,
     get_panel_entity_suffix,
 )
-from custom_components.span_panel.sensor_definitions import (
+from ..sensor_definitions import (
     SpanPanelBatterySensorEntityDescription,
     SpanPanelDataSensorEntityDescription,
     SpanPanelStatusSensorEntityDescription,
 )
-from custom_components.span_panel.span_panel import SpanPanel
-from custom_components.span_panel.span_panel_data import SpanPanelData
-from custom_components.span_panel.span_panel_hardware_status import SpanPanelHardwareStatus
-from custom_components.span_panel.span_panel_storage_battery import SpanPanelStorageBattery
-
+from ..span_panel import SpanPanel
+from ..span_panel_data import SpanPanelData
+from ..span_panel_hardware_status import SpanPanelHardwareStatus
+from ..span_panel_storage_battery import SpanPanelStorageBattery
 from .base import SpanEnergySensorBase, SpanSensorBase
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

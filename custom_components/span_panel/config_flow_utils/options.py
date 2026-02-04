@@ -13,7 +13,7 @@ from homeassistant.helpers.selector import selector
 from homeassistant.util import slugify
 import voluptuous as vol
 
-from custom_components.span_panel.const import (
+from ..const import (
     CONF_API_RETRIES,
     CONF_API_RETRY_BACKOFF_MULTIPLIER,
     CONF_API_RETRY_TIMEOUT,
@@ -31,14 +31,13 @@ from custom_components.span_panel.const import (
     USE_DEVICE_PREFIX,
     EntityNamingPattern,
 )
-from custom_components.span_panel.options import (
+from ..options import (
     BATTERY_ENABLE,
     ENERGY_REPORTING_GRACE_PERIOD,
     INVERTER_ENABLE,
     INVERTER_LEG1,
     INVERTER_LEG2,
 )
-
 from .validation import get_filtered_tab_options, validate_solar_configuration
 
 _LOGGER = logging.getLogger(__name__)

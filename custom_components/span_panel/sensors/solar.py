@@ -8,13 +8,12 @@ from typing import Any
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.helpers.typing import UNDEFINED
 
-from custom_components.span_panel.coordinator import SpanPanelCoordinator
-from custom_components.span_panel.helpers import (
+from ..coordinator import SpanPanelCoordinator
+from ..helpers import (
     construct_panel_unique_id_for_entry,
 )
-from custom_components.span_panel.sensor_definitions import SpanSolarSensorEntityDescription
-from custom_components.span_panel.span_panel import SpanPanel
-
+from ..sensor_definitions import SpanSolarSensorEntityDescription
+from ..span_panel import SpanPanel
 from .base import SpanEnergySensorBase, SpanSensorBase
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

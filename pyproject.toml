@@ -174,6 +174,7 @@ ignore = [
 "test_*.py" = ["T201", "D103", "D100", "E402", "TID252"]  # Allow print statements, missing docstrings, and imports inside functions in test files
 "debug_*.py" = ["T201", "D103", "D100", "E402", "TID252"]  # Allow print statements, missing docstrings, and imports inside functions in debug files
 "tests/**/*.py" = ["T201", "D103", "D100", "E402", "TID252"]  # Allow print statements, missing docstrings, and imports inside functions in test directory
+"custom_components/**/*.py" = ["TID252"]  # Home Assistant custom components require relative imports
 
 # Bandit configuration
 [tool.bandit]

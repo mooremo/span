@@ -24,7 +24,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
-from custom_components.span_panel.const import DOMAIN
+from ..const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

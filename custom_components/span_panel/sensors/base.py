@@ -23,11 +23,11 @@ from homeassistant.helpers.restore_state import ExtraStoredData
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.span_panel.const import DOMAIN
-from custom_components.span_panel.coordinator import SpanPanelCoordinator
-from custom_components.span_panel.options import ENERGY_REPORTING_GRACE_PERIOD
-from custom_components.span_panel.span_panel import SpanPanel
-from custom_components.span_panel.util import panel_to_device_info
+from ..const import DOMAIN
+from ..coordinator import SpanPanelCoordinator
+from ..options import ENERGY_REPORTING_GRACE_PERIOD
+from ..span_panel import SpanPanel
+from ..util import panel_to_device_info
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

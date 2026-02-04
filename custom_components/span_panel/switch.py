@@ -11,8 +11,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.span_panel.span_panel_circuit import SpanPanelCircuit
-
 from .const import (
     COORDINATOR,
     DOMAIN,
@@ -24,6 +22,7 @@ from .helpers import (
     build_switch_unique_id_for_entry,
 )
 from .span_panel import SpanPanel
+from .span_panel_circuit import SpanPanelCircuit
 from .util import panel_to_device_info
 
 ICON: Literal["mdi:toggle-switch"] = "mdi:toggle-switch"
