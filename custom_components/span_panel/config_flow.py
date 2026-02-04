@@ -9,7 +9,6 @@ from pathlib import Path
 import shutil
 from time import time
 from typing import TYPE_CHECKING, Any
-import uuid
 
 from homeassistant import config_entries
 from homeassistant.config_entries import (
@@ -24,22 +23,25 @@ from homeassistant.helpers.selector import selector
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.util import slugify
 from homeassistant.util.network import is_ipv4_address
-from span_panel_api import SpanPanelClient
 from span_panel_api.simulation import DynamicSimulationEngine, SimulationConfig
 import voluptuous as vol
 import yaml
 
 from .config_flow_utils import (
     build_general_options_schema,
+    create_config_client,
     get_available_simulation_configs,
     get_available_unmapped_tabs,
     get_current_naming_pattern,
     get_general_options_defaults,
     pattern_to_flags,
     process_general_options_input,
-    validate_auth_token,
     validate_host,
     validate_simulation_time,
+)
+from .config_flow_utils.authentication import (
+    authenticate_via_proximity,
+    authenticate_via_token,
 )
 from .config_flow_utils.options import (
     build_entity_naming_options_schema,
@@ -54,10 +56,6 @@ from .const import (
     CONF_SIMULATION_OFFLINE_MINUTES,
     CONF_SIMULATION_START_TIME,
     CONF_USE_SSL,
-    CONFIG_API_RETRIES,
-    CONFIG_API_RETRY_BACKOFF_MULTIPLIER,
-    CONFIG_API_RETRY_TIMEOUT,
-    CONFIG_TIMEOUT,
     COORDINATOR,
     DOMAIN,
     ENTITY_NAMING_PATTERN,
@@ -90,7 +88,7 @@ SIM_IMPORT_PATH = "simulation_import_path"
 
 
 if TYPE_CHECKING:
-    from span_panel_api import SpanPanelClient
+    pass
 
 
 def get_user_data_schema(default_host: str = "") -> vol.Schema:
@@ -120,18 +118,6 @@ class TriggerFlowType(enum.Enum):
 
     CREATE_ENTRY = enum.auto()
     UPDATE_ENTRY = enum.auto()
-
-
-def create_config_client(host: str, use_ssl: bool = False) -> SpanPanelClient:
-    """Create a SpanPanelClient with config settings for quick feedback."""
-    return SpanPanelClient(
-        host=host,
-        timeout=CONFIG_TIMEOUT,
-        use_ssl=use_ssl,
-        retries=CONFIG_API_RETRIES,
-        retry_timeout=CONFIG_API_RETRY_TIMEOUT,
-        retry_backoff_multiplier=CONFIG_API_RETRY_BACKOFF_MULTIPLIER,
-    )
 
 
 def create_api_controller(
@@ -182,14 +168,7 @@ class SpanPanelConfigFlow(config_entries.ConfigFlow):
             raise ConfigFlowError("Flow is already set up")
 
         # Use config settings for quick feedback - no retries and shorter timeout
-        async with SpanPanelClient(
-            host=host,
-            timeout=CONFIG_TIMEOUT,
-            use_ssl=use_ssl,
-            retries=CONFIG_API_RETRIES,
-            retry_timeout=CONFIG_API_RETRY_TIMEOUT,
-            retry_backoff_multiplier=CONFIG_API_RETRY_BACKOFF_MULTIPLIER,
-        ) as client:
+        async with create_config_client(host, use_ssl) as client:
             status_response = await client.get_status()
             # Convert to our data class format
             status_dict = status_response.to_dict()  # type: ignore[attr-defined]
@@ -483,48 +462,24 @@ class SpanPanelConfigFlow(config_entries.ConfigFlow):
         self.ensure_flow_is_set_up()
 
         # Use config settings for quick feedback - no retries and shorter timeout
-        async with SpanPanelClient(
-            host=self.host or "",
-            timeout=CONFIG_TIMEOUT,
-            use_ssl=self.use_ssl,
-            retries=CONFIG_API_RETRIES,
-            retry_timeout=CONFIG_API_RETRY_TIMEOUT,
-            retry_backoff_multiplier=CONFIG_API_RETRY_BACKOFF_MULTIPLIER,
-        ) as client:
-            # Get status to check proximity state
-            status_response = await client.get_status()
-            status_dict = status_response.to_dict()  # type: ignore[attr-defined]
-            panel_status = SpanPanelHardwareStatus.from_dict(status_dict)
-
-            # Check if running firmware newer or older than r202342
-            if panel_status.proximity_proven is not None:
-                # Reprompt until we are able to do proximity auth for new firmware
-                proximity_verified: bool = panel_status.proximity_proven
-                if proximity_verified is False:
-                    return self.async_show_form(step_id="auth_proximity")
-            else:
-                # Reprompt until we are able to do proximity auth for old firmware
-                remaining_presses: int = panel_status.remaining_auth_unlock_button_presses
-                if remaining_presses != 0:
-                    return self.async_show_form(
-                        step_id="auth_proximity",
-                    )
-
-            # Ensure host is set
-            if not self.host:
-                return self.async_abort(reason="host_not_set")
-
-            client_name = f"home-assistant-{uuid.uuid4()}"
-            auth_response = await client.authenticate(
-                client_name, "Home Assistant Local Span Integration"
+        async with create_config_client(self.host or "", self.use_ssl) as client:
+            result = await authenticate_via_proximity(
+                hass=self.hass,
+                client=client,
+                host=self.host or "",
+                use_ssl=self.use_ssl,
             )
-            self.access_token = auth_response.access_token
-        # Type checking: ensure access_token is not None before calling validate_auth_token
-        if self.access_token is None:
-            return self.async_abort(reason="invalid_access_token")
-        if not await validate_auth_token(self.hass, self.host, self.access_token, self.use_ssl):
-            return self.async_abort(reason="invalid_access_token")
 
+        # Check if retry is required (button not pressed yet)
+        if result.requires_retry:
+            return self.async_show_form(step_id="auth_proximity")
+
+        # Check for authentication failure
+        if not result.success:
+            return self.async_abort(reason=result.error_reason or "auth_failed")
+
+        # Authentication successful
+        self.access_token = result.access_token
         return await self.async_step_resolve_entity(entry_data)
 
     async def async_step_auth_token(
@@ -543,31 +498,25 @@ class SpanPanelConfigFlow(config_entries.ConfigFlow):
         # Extract access token from user input
         access_token: str | None = user_input.get(CONF_ACCESS_TOKEN)
 
-        # Check if token was provided and is not empty
-        if access_token and access_token.strip():
-            self.access_token = access_token.strip()
-
-            # Ensure host is set
-            if not self.host:
-                return self.async_abort(reason="host_not_set")
-
-            # Validate the provided token
-            if not await validate_auth_token(self.hass, self.host, self.access_token, self.use_ssl):
-                return self.async_show_form(
-                    step_id="auth_token",
-                    data_schema=STEP_AUTH_TOKEN_DATA_SCHEMA,
-                    errors={"base": "invalid_access_token"},
-                )
-
-            # Proceed to pre-setup naming selection then to entry creation
-            return await self.async_step_resolve_entity(user_input)
-
-        # If no access token was provided or it's empty, show form with error
-        return self.async_show_form(
-            step_id="auth_token",
-            data_schema=STEP_AUTH_TOKEN_DATA_SCHEMA,
-            errors={"base": "missing_access_token"},
+        # Authenticate using the provided token
+        result = await authenticate_via_token(
+            hass=self.hass,
+            host=self.host or "",
+            access_token=access_token or "",
+            use_ssl=self.use_ssl,
         )
+
+        # Check for authentication failure
+        if not result.success:
+            return self.async_show_form(
+                step_id="auth_token",
+                data_schema=STEP_AUTH_TOKEN_DATA_SCHEMA,
+                errors={"base": result.error_reason or "auth_failed"},
+            )
+
+        # Authentication successful
+        self.access_token = result.access_token
+        return await self.async_step_resolve_entity(user_input)
 
     async def async_step_resolve_entity(
         self,
